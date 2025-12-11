@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
  */
 data class PoseUiState(
     val selectedModel: ModelType = ModelType.MOVENET_LIGHTNING,
-    val selectedDelegate: DelegateType = DelegateType.CPU,
+    val selectedDelegate: DelegateType = DelegateType.CPU_BASELINE, // Start with baseline
     val detectedPerson: Person? = null,
     val inferenceTime: Long = 0L, // in milliseconds
     val fps: Float = 0f,
@@ -92,7 +92,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = currentState.copy(
                     isInitialized = true,
                     errorMessage = if (!isGpuCompatible && currentState.selectedDelegate == DelegateType.GPU) {
-                        "GPU not compatible, using CPU fallback"
+                        "GPU not compatible, falling back to CPU XNNPACK"
                     } else null
                 )
 

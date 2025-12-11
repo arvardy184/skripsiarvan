@@ -6,9 +6,7 @@ import com.application.skripsiarvan.domain.model.DelegateType
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
-import org.tensorflow.lite.nnapi.NnApiDelegate
 import java.io.FileInputStream
-import java.nio.ByteBuffer
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
@@ -22,7 +20,6 @@ class TFLiteHelper(
 ) {
     private var interpreter: Interpreter? = null
     private var gpuDelegate: GpuDelegate? = null
-    private var nnApiDelegate: NnApiDelegate? = null
 
     companion object {
         private const val TAG = "TFLiteHelper"
@@ -41,15 +38,25 @@ class TFLiteHelper(
             var isGpuCompatible = false
 
             when (delegateType) {
-                DelegateType.CPU -> {
-                    // Default CPU with XNNPACK optimization
+                DelegateType.CPU_BASELINE -> {
+                    // Level 1: TFLite default kernel WITHOUT XNNPACK optimization
+                    // This is the baseline for performance comparison
+                    options.setNumThreads(NUM_THREADS)
+                    options.setUseXNNPACK(false)  // Explicitly disable XNNPACK
+                    Log.d(TAG, "Level 1: Using CPU Baseline (no XNNPACK optimization)")
+                }
+
+                DelegateType.CPU_XNNPACK -> {
+                    // Level 2: CPU with XNNPACK optimization (SIMD)
+                    // Shows improvement from software optimization
                     options.setNumThreads(NUM_THREADS)
                     options.setUseXNNPACK(true)
-                    Log.d(TAG, "Using CPU delegate with XNNPACK")
+                    Log.d(TAG, "Level 2: Using CPU with XNNPACK (SIMD optimization)")
                 }
 
                 DelegateType.GPU -> {
-                    // Check GPU compatibility
+                    // Level 3: Hardware acceleration via GPU
+                    // Check GPU compatibility first
                     val compatibilityList = CompatibilityList()
                     isGpuCompatible = compatibilityList.isDelegateSupportedOnThisDevice
 
@@ -57,20 +64,13 @@ class TFLiteHelper(
                         val delegateOptions = compatibilityList.bestOptionsForThisDevice
                         gpuDelegate = GpuDelegate(delegateOptions)
                         options.addDelegate(gpuDelegate)
-                        Log.d(TAG, "Using GPU delegate")
+                        Log.d(TAG, "Level 3: Using GPU Delegate (OpenGL/OpenCL)")
                     } else {
-                        // Fallback to CPU
-                        Log.w(TAG, "GPU not compatible, falling back to CPU")
+                        // Fallback to CPU XNNPACK if GPU not available
+                        Log.w(TAG, "GPU not compatible, falling back to CPU XNNPACK")
                         options.setNumThreads(NUM_THREADS)
                         options.setUseXNNPACK(true)
                     }
-                }
-
-                DelegateType.NNAPI -> {
-                    // NNAPI delegate for NPU/DSP acceleration
-                    nnApiDelegate = NnApiDelegate()
-                    options.addDelegate(nnApiDelegate)
-                    Log.d(TAG, "Using NNAPI delegate")
                 }
             }
 
@@ -106,9 +106,6 @@ class TFLiteHelper(
 
         gpuDelegate?.close()
         gpuDelegate = null
-
-        nnApiDelegate?.close()
-        nnApiDelegate = null
 
         Log.d(TAG, "Interpreter and delegates closed")
     }

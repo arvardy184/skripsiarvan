@@ -7,7 +7,7 @@ A research tool for measuring and comparing the performance of pose estimation m
 AccelPose is designed for Computer Science thesis research to benchmark:
 - **Inference Latency**: Precise measurement of model inference time
 - **FPS (Frames Per Second)**: End-to-end processing performance
-- **Hardware Acceleration**: CPU (XNNPACK), GPU, and NNAPI delegate comparison
+- **3-Level Performance Progression**: CPU Baseline → CPU XNNPACK → GPU Delegate
 
 ### Supported Models
 1. **MoveNet Lightning (INT8)** - Fast, efficient pose detection
@@ -52,22 +52,33 @@ app/src/main/java/com/application/skripsiarvan/
 - FPS calculation based on frame processing rate
 - Live metrics display on UI
 
-### 2. **Hardware Acceleration Switching**
+### 2. **3-Level Performance Progression**
 ```kotlin
-// CPU with XNNPACK
-DelegateType.CPU -> options.setUseXNNPACK(true)
+// Level 1: CPU Baseline (no optimization)
+DelegateType.CPU_BASELINE -> {
+    options.setNumThreads(4)
+    options.setUseXNNPACK(false)  // Explicitly disabled
+}
 
-// GPU Delegate (with compatibility check)
+// Level 2: CPU XNNPACK (software optimization via SIMD)
+DelegateType.CPU_XNNPACK -> {
+    options.setNumThreads(4)
+    options.setUseXNNPACK(true)   // SIMD optimization enabled
+}
+
+// Level 3: GPU Delegate (hardware acceleration)
 DelegateType.GPU -> {
     val compatibilityList = CompatibilityList()
     if (compatibilityList.isDelegateSupportedOnThisDevice) {
         options.addDelegate(GpuDelegate(delegateOptions))
     }
 }
-
-// NNAPI (NPU/DSP acceleration)
-DelegateType.NNAPI -> options.addDelegate(NnApiDelegate())
 ```
+
+**Research Purpose:**
+- **Level 1**: Baseline measurement without any optimization
+- **Level 2**: Show impact of software optimization (SIMD/XNNPACK)
+- **Level 3**: Show impact of hardware acceleration (GPU)
 
 ### 3. **Model Switching at Runtime**
 Toggle between MoveNet and BlazePose without restarting the app.
@@ -130,11 +141,14 @@ Or use Android Studio: **Run > Run 'app'**
 
 1. **Grant Camera Permission** when prompted
 2. **Select Model** from the dropdown (MoveNet or BlazePose)
-3. **Select Hardware Accelerator** (CPU, GPU, or NNAPI)
+3. **Select Acceleration Level**:
+   - **Level 1: CPU Baseline** - No optimization (baseline measurement)
+   - **Level 2: CPU XNNPACK** - Software optimization (SIMD)
+   - **Level 3: GPU Delegate** - Hardware acceleration
 4. **Observe Metrics**:
    - **Inference Time**: Time for model inference only (ms)
    - **FPS**: Frames processed per second
-5. **Switch configurations** to compare performance
+5. **Switch configurations** to compare performance across all 3 levels
 
 ## 📊 Performance Benchmarking
 
@@ -156,18 +170,24 @@ if (elapsedTime >= 1000) {
 }
 ```
 
-### Comparison Matrix
+### Performance Comparison Matrix (3-Level Progression)
 
-| Model | Delegate | Expected Inference Time | Expected FPS |
-|-------|----------|------------------------|--------------|
-| MoveNet Lightning | CPU | 20-50 ms | 20-30 FPS |
-| MoveNet Lightning | GPU | 10-20 ms | 40-60 FPS |
-| MoveNet Lightning | NNAPI | 15-30 ms | 30-50 FPS |
-| BlazePose Lite | CPU | 40-80 ms | 10-20 FPS |
-| BlazePose Lite | GPU | 20-40 ms | 25-40 FPS |
-| BlazePose Lite | NNAPI | 30-60 ms | 15-30 FPS |
+| Model | Acceleration Level | Expected Inference Time | Expected FPS | Performance Gain |
+|-------|-------------------|------------------------|--------------|------------------|
+| MoveNet Lightning | Level 1: CPU Baseline | 50-80 ms | 12-20 FPS | Baseline (1.0x) |
+| MoveNet Lightning | Level 2: CPU XNNPACK | 20-40 ms | 25-35 FPS | ~2x faster |
+| MoveNet Lightning | Level 3: GPU Delegate | 10-20 ms | 40-60 FPS | ~4-5x faster |
+| | | | | |
+| BlazePose Lite | Level 1: CPU Baseline | 80-120 ms | 8-12 FPS | Baseline (1.0x) |
+| BlazePose Lite | Level 2: CPU XNNPACK | 40-70 ms | 14-20 FPS | ~2x faster |
+| BlazePose Lite | Level 3: GPU Delegate | 20-40 ms | 25-40 FPS | ~3-4x faster |
 
-*Note: Actual performance varies by device*
+**Research Insights:**
+- **Level 1 → Level 2**: Shows pure software optimization impact (XNNPACK/SIMD)
+- **Level 2 → Level 3**: Shows hardware acceleration impact (GPU vs CPU)
+- **Level 1 → Level 3**: Shows total optimization potential
+
+*Note: Actual performance varies by device chipset (Snapdragon, Exynos, MediaTek)*
 
 ## 🔧 Technical Implementation Details
 
@@ -204,9 +224,9 @@ interface PoseDetector {
 
 1. **BlazePose Model**: The current implementation uses a simplified output parsing. You may need to adjust the model file or output tensor mapping based on the specific BlazePose variant.
 
-2. **GPU Delegate**: Not all devices support GPU acceleration. The app automatically falls back to CPU with a warning message.
+2. **GPU Delegate**: Not all devices support GPU acceleration. The app automatically falls back to CPU XNNPACK (Level 2) with a warning message.
 
-3. **NNAPI**: Performance varies significantly across devices and Android versions.
+3. **Level 1 Performance**: CPU Baseline (without XNNPACK) will be significantly slower. This is intentional for research comparison purposes.
 
 ## 📚 Research Use
 
