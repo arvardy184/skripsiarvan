@@ -13,3 +13,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# TensorFlow Lite Models (too large for git)
+*.tflite
+*.task
