@@ -136,11 +136,16 @@ interface PoseDetector {
   - Automatic fallback to CPU if GPU unavailable
   - Proper resource cleanup
 
-**Delegate Initialization**:
+**3-Level Delegate Initialization**:
 ```kotlin
-DelegateType.CPU   -> options.setUseXNNPACK(true)
-DelegateType.GPU   -> options.addDelegate(GpuDelegate(delegateOptions))
-DelegateType.NNAPI -> options.addDelegate(NnApiDelegate())
+// Level 1: Baseline (no optimization)
+DelegateType.CPU_BASELINE -> options.setUseXNNPACK(false)
+
+// Level 2: Software optimization (SIMD)
+DelegateType.CPU_XNNPACK  -> options.setUseXNNPACK(true)
+
+// Level 3: Hardware acceleration
+DelegateType.GPU          -> options.addDelegate(GpuDelegate(delegateOptions))
 ```
 
 #### `data/detector/MoveNetDetector.kt` (92 lines)
@@ -284,24 +289,25 @@ if (elapsedTime >= 1000) { // Update every second
 ## 🎨 UI Layout
 
 ```
-┌────────────────────────────────────┐
-│                                    │
-│        Camera Preview              │
-│         (with Pose Overlay)        │
-│                                    │
-│                                    │
-│                                    │
-├────────────────────────────────────┤
-│  AccelPose - Performance Benchmark │
-│                                    │
-│  Model: [MoveNet Lightning ▼]     │
-│  Accelerator: [CPU (XNNPACK) ▼]   │
-│  ─────────────────────────────     │
-│  Inference: 25 ms    FPS: 35.2    │
-│  ─────────────────────────────     │
-│  Device: Samsung Galaxy S21        │
-│  Android 13 (API 33)              │
-└────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│                                             │
+│        Camera Preview                       │
+│         (with Pose Overlay)                 │
+│                                             │
+│                                             │
+│                                             │
+├─────────────────────────────────────────────┤
+│  AccelPose - Performance Benchmark          │
+│                                             │
+│  Model: [MoveNet Lightning ▼]              │
+│  Hardware Accelerator:                      │
+│    [Level 2: CPU (XNNPACK) ▼]              │
+│  ─────────────────────────────              │
+│  Inference: 25 ms    FPS: 35.2             │
+│  ─────────────────────────────              │
+│  Device: Samsung Galaxy S21                 │
+│  Android 13 (API 33)                       │
+└─────────────────────────────────────────────┘
 ```
 
 ## 🧪 Testing Strategy
@@ -320,12 +326,14 @@ if (elapsedTime >= 1000) { // Update every second
 - [ ] Camera permission granted/denied
 - [ ] MoveNet model loads successfully
 - [ ] BlazePose model loads successfully
-- [ ] CPU delegate works
-- [ ] GPU delegate works (or falls back to CPU)
-- [ ] NNAPI delegate works
+- [ ] Level 1: CPU Baseline works (slowest, as expected)
+- [ ] Level 2: CPU XNNPACK works (~2x faster than Level 1)
+- [ ] Level 3: GPU Delegate works (or falls back to Level 2)
+- [ ] Performance progression visible: Level 1 < Level 2 < Level 3
 - [ ] Pose visualization renders correctly
 - [ ] Metrics update in real-time
 - [ ] App handles rotation gracefully
+- [ ] Switching between levels updates performance metrics
 
 ## 🔧 Build Commands
 

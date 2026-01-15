@@ -88,35 +88,39 @@ Run > Run 'app' (Shift+F10)
 When the app launches:
 1. Tap "Allow" when prompted for camera access
 2. Camera preview should appear immediately
-3. Default configuration: **MoveNet Lightning + CPU**
+3. Default configuration: **MoveNet Lightning + Level 1: CPU Baseline**
 
 ---
 
-### Step 6: Test Performance
+### Step 6: Test Performance (3-Level Progression)
 
-#### Quick Test Sequence:
+#### Quick Test Sequence - Follow this order for best research results:
 
-1. **CPU Baseline**
+**With MoveNet Lightning:**
+
+1. **Level 1: CPU Baseline** (No Optimization)
    - Model: MoveNet Lightning
-   - Accelerator: CPU (XNNPACK)
-   - Expected: ~30-50ms inference, 20-30 FPS
+   - Acceleration: Level 1: CPU (Baseline/Legacy)
+   - Expected: ~50-80ms inference, 12-20 FPS
+   - Purpose: Baseline measurement
 
-2. **GPU Acceleration** (if supported)
+2. **Level 2: CPU XNNPACK** (Software Optimization)
    - Model: MoveNet Lightning
-   - Accelerator: GPU
+   - Acceleration: Level 2: CPU (XNNPACK)
+   - Expected: ~20-40ms inference, 25-35 FPS
+   - Purpose: Show SIMD optimization impact (~2x faster)
+
+3. **Level 3: GPU Delegate** (Hardware Acceleration)
+   - Model: MoveNet Lightning
+   - Acceleration: Level 3: GPU Delegate
    - Expected: ~10-20ms inference, 40-60 FPS
+   - Purpose: Show hardware acceleration impact (~4-5x faster)
 
-3. **NNAPI** (device-dependent)
-   - Model: MoveNet Lightning
-   - Accelerator: NNAPI
-   - Expected: Varies (15-30ms typical)
+**If BlazePose is installed, repeat with:**
 
-#### If BlazePose is installed:
-
-4. **BlazePose + GPU**
-   - Model: MediaPipe BlazePose Lite
-   - Accelerator: GPU
-   - Expected: ~20-40ms inference, 25-40 FPS
+4. **BlazePose + Level 1**: ~80-120ms, 8-12 FPS
+5. **BlazePose + Level 2**: ~40-70ms, 14-20 FPS
+6. **BlazePose + Level 3**: ~20-40ms, 25-40 FPS
 
 ---
 
@@ -136,14 +140,15 @@ When the app launches:
 - Try moving closer/farther from camera
 
 **Low FPS?**
-- Switch to MoveNet Lightning (faster)
-- Try GPU delegate
+- Try higher acceleration level (Level 1 → 2 → 3)
+- Switch to MoveNet Lightning (faster than BlazePose)
 - Close background apps
 
 **GPU not working?**
-- App will show "GPU not compatible, using CPU fallback"
+- App will show "GPU not compatible, falling back to CPU XNNPACK"
 - This is normal on some devices
-- CPU will be used automatically
+- Will automatically use Level 2 (CPU XNNPACK) instead
+- You can still compare Level 1 vs Level 2 for research
 
 ---
 
@@ -208,23 +213,31 @@ adb logcat | grep skripsiarvan
 
 ## 🎓 Research Data Collection
 
-### Recommended Testing Matrix
+### Recommended Testing Matrix (3-Level Progression)
 
-| Device | Model | Delegate | Trials | Notes |
-|--------|-------|----------|--------|-------|
-| Your Phone | MoveNet | CPU | 3x | Baseline |
-| Your Phone | MoveNet | GPU | 3x | Best perf |
-| Your Phone | MoveNet | NNAPI | 3x | NPU test |
-| Your Phone | BlazePose | GPU | 3x | Accuracy |
+| Device | Model | Acceleration Level | Trials | Purpose |
+|--------|-------|-------------------|--------|---------|
+| Your Phone | MoveNet | Level 1: CPU Baseline | 3x | Baseline (no opt) |
+| Your Phone | MoveNet | Level 2: CPU XNNPACK | 3x | Software opt |
+| Your Phone | MoveNet | Level 3: GPU Delegate | 3x | Hardware accel |
+| Your Phone | BlazePose | Level 1: CPU Baseline | 3x | Baseline |
+| Your Phone | BlazePose | Level 2: CPU XNNPACK | 3x | Software opt |
+| Your Phone | BlazePose | Level 3: GPU Delegate | 3x | Hardware accel |
+
+**Analysis Focus:**
+- **Level 1 vs 2**: Measure XNNPACK/SIMD optimization impact
+- **Level 2 vs 3**: Measure GPU acceleration impact
+- **Level 1 vs 3**: Total optimization potential
 
 ### Data to Record:
 - Device name & specs (CPU, GPU, RAM)
 - Android version
-- Model type
-- Delegate type
+- Model type (MoveNet or BlazePose)
+- Acceleration level (Level 1, 2, or 3)
 - Average inference time (ms)
 - Average FPS
 - Min/Max values
+- Performance gain vs baseline
 - Test conditions (lighting, pose type)
 
 ### Export Method (Manual):
@@ -239,42 +252,50 @@ adb logcat | grep skripsiarvan
 ## 🚀 Next Steps
 
 ### Immediate:
-1. ✅ Run with MoveNet + CPU
-2. ✅ Test GPU delegate
-3. ✅ Compare performance
+1. ✅ Run with MoveNet + Level 1 (Baseline)
+2. ✅ Test Level 2 (XNNPACK) - measure software optimization impact
+3. ✅ Test Level 3 (GPU) - measure hardware acceleration impact
+4. ✅ Compare all 3 levels
 
 ### Short-term:
 1. Add BlazePose model
-2. Test on multiple devices
-3. Collect benchmark data
+2. Repeat 3-level test with BlazePose
+3. Test on multiple devices
+4. Collect benchmark data for all levels
 
 ### For Thesis:
-1. Document methodology
-2. Run statistical analysis
-3. Create comparison charts
-4. Write performance section
+1. Document 3-level testing methodology
+2. Run statistical analysis (ANOVA across levels)
+3. Create comparison charts (Level 1 vs 2 vs 3)
+4. Calculate optimization factors (XNNPACK speedup, GPU speedup)
+5. Write performance section with clear progression analysis
 
 ---
 
 ## 📱 Recommended Test Devices
 
 ### Ideal for Research:
-- **Flagship**: Samsung Galaxy S21+, Pixel 6+
-  - Strong GPU, NNAPI support
-  - Consistent performance
+- **Flagship**: Samsung Galaxy S21+, Pixel 6+, OnePlus 9+
+  - Strong GPU (Level 3 performance)
+  - Shows maximum optimization potential
+  - Clear 3-level progression
 
 - **Mid-range**: Samsung A52, Xiaomi Redmi Note 10
   - Real-world use case
+  - GPU may be weaker (good for comparison)
   - Budget hardware insights
 
 - **Low-end**: Entry-level devices
-  - CPU-only performance
+  - May only have CPU (compare Level 1 vs 2)
   - Accessibility testing
+  - Shows importance of software optimization
 
-### Chipset Variety:
+### Chipset Variety (for comprehensive research):
 - Qualcomm Snapdragon (Adreno GPU)
 - Samsung Exynos (Mali GPU)
 - MediaTek Dimensity (Mali GPU)
+
+**Research Tip**: Test same model on different chipsets to see how XNNPACK and GPU perform across different hardware.
 
 ---
 
