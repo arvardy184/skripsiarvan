@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
+import androidx.core.graphics.scale
 
 /**
  * CameraX ImageAnalyzer for real-time pose detection
@@ -18,7 +19,7 @@ import java.nio.ByteBuffer
  */
 class PoseImageAnalyzer(
     private val poseDetector: PoseDetector,
-    private val onResults: (Person?, Long, Float) -> Unit // (person, inferenceTime, fps)
+    private val onResults: (Person?, Long, Float) -> Unit, // (person, inferenceTime, fps)
 ) : ImageAnalysis.Analyzer {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -36,12 +37,7 @@ class PoseImageAnalyzer(
 
             // Resize to model input size
             val inputSize = poseDetector.getInputSize()
-            val resizedBitmap = Bitmap.createScaledBitmap(
-                rotatedBitmap,
-                inputSize.first,
-                inputSize.second,
-                true
-            )
+            val resizedBitmap = rotatedBitmap.scale(inputSize.first, inputSize.second)
 
             // Run inference
             val person = poseDetector.detectPose(resizedBitmap)

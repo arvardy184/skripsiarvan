@@ -8,7 +8,6 @@ import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.nnapi.NnApiDelegate
 import java.io.FileInputStream
-import java.nio.ByteBuffer
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
@@ -54,8 +53,7 @@ class TFLiteHelper(
                     isGpuCompatible = compatibilityList.isDelegateSupportedOnThisDevice
 
                     if (isGpuCompatible) {
-                        val delegateOptions = compatibilityList.bestOptionsForThisDevice
-                        gpuDelegate = GpuDelegate(delegateOptions)
+                        gpuDelegate = GpuDelegate()
                         options.addDelegate(gpuDelegate)
                         Log.d(TAG, "Using GPU delegate")
                     } else {
