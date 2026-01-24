@@ -4,8 +4,8 @@ import android.graphics.Bitmap
 import com.application.skripsiarvan.domain.model.Person
 
 /**
- * Strategy pattern interface for pose detection
- * Allows easy swapping between different models (MoveNet, BlazePose, etc.)
+ * Strategy pattern interface for pose detection Allows easy swapping between different models
+ * (MoveNet, BlazePose, etc.)
  */
 interface PoseDetector {
 
@@ -22,8 +22,9 @@ interface PoseDetector {
      */
     fun getInputSize(): Pair<Int, Int>
 
-    /**
-     * Clean up resources
-     */
+    /** Clean up resources */
     fun close()
+
+    /** Check if the detector has been closed */
+    fun isClosed(): Boolean
 }

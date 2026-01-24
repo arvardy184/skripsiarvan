@@ -1,5 +1,6 @@
 package com.application.skripsiarvan.domain.exercise
 
+import android.util.Log
 import com.application.skripsiarvan.domain.model.Keypoint
 import com.application.skripsiarvan.domain.model.Person
 import com.application.skripsiarvan.domain.model.BodyPart
@@ -13,6 +14,8 @@ import kotlin.math.sqrt
  * Sesuai dengan Flowchart 4.4 Perhitungan Repetisi di skripsi
  */
 object AngleCalculator {
+    
+    private const val TAG = "AngleCalculator"
 
     /**
      * Menghitung sudut antara tiga titik dalam derajat
@@ -113,11 +116,28 @@ object AngleCalculator {
         val leftAngle = getLeftKneeAngle(person)
         val rightAngle = getRightKneeAngle(person)
 
+        // Debug: Log keypoint confidence
+        val leftKnee = person.keypoints.getOrNull(BodyPart.LEFT_KNEE)
+        val rightKnee = person.keypoints.getOrNull(BodyPart.RIGHT_KNEE)
+        Log.d(TAG, "🦵 Knee confidence - Left: ${leftKnee?.score ?: 0f}, Right: ${rightKnee?.score ?: 0f}")
+
         return when {
-            leftAngle != null && rightAngle != null -> (leftAngle + rightAngle) / 2
-            leftAngle != null -> leftAngle
-            rightAngle != null -> rightAngle
-            else -> null
+            leftAngle != null && rightAngle != null -> {
+                Log.d(TAG, "✅ Using average knee angle: L=%.1f° R=%.1f°".format(leftAngle, rightAngle))
+                (leftAngle + rightAngle) / 2
+            }
+            leftAngle != null -> {
+                Log.d(TAG, "⚠️ Using only LEFT knee angle: %.1f°".format(leftAngle))
+                leftAngle
+            }
+            rightAngle != null -> {
+                Log.d(TAG, "⚠️ Using only RIGHT knee angle: %.1f°".format(rightAngle))
+                rightAngle
+            }
+            else -> {
+                Log.d(TAG, "❌ No knee angles available (confidence too low or keypoints missing)")
+                null
+            }
         }
     }
 

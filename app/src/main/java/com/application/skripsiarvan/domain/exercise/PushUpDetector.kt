@@ -1,5 +1,6 @@
 package com.application.skripsiarvan.domain.exercise
 
+import android.util.Log
 import com.application.skripsiarvan.domain.model.ExerciseState
 import com.application.skripsiarvan.domain.model.Person
 
@@ -18,6 +19,8 @@ import com.application.skripsiarvan.domain.model.Person
 class PushUpDetector : ExerciseDetector {
 
     companion object {
+        private const val TAG = "PushUpDetector"
+        
         // Threshold sudut siku untuk deteksi
         private const val ANGLE_THRESHOLD_UP = 155.0    // Posisi atas (siku lurus)
         private const val ANGLE_THRESHOLD_DOWN = 100.0  // Posisi bawah (siku ditekuk)
@@ -38,12 +41,19 @@ class PushUpDetector : ExerciseDetector {
     }
 
     override fun analyzeFrame(person: Person?): ExerciseState {
-        if (person == null) return ExerciseState.IDLE
+        if (person == null) {
+            Log.d(TAG, "❌ Person is null - no pose detected")
+            return ExerciseState.IDLE
+        }
 
         val elbowAngle = AngleCalculator.getAverageElbowAngle(person)
-        if (elbowAngle == null) return ExerciseState.IDLE
+        if (elbowAngle == null) {
+            Log.d(TAG, "❌ Elbow angle is null - keypoints not detected or low confidence")
+            return ExerciseState.IDLE
+        }
 
         lastAngle = elbowAngle
+        Log.d(TAG, "📐 Elbow angle: %.1f° | State: %s".format(elbowAngle, currentState.name))
         val exerciseState: ExerciseState
 
         when (currentState) {
@@ -86,6 +96,7 @@ class PushUpDetector : ExerciseDetector {
                     // Kembali ke posisi atas - 1 repetisi selesai!
                     currentState = PushUpState.UP
                     repetitionCount++
+                    Log.d(TAG, "✅ REP COMPLETED! Total: $repetitionCount")
                     exerciseState = ExerciseState.COMPLETED
                 } else if (elbowAngle < ANGLE_THRESHOLD_DOWN) {
                     // Turun lagi sebelum naik penuh

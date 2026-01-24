@@ -1,5 +1,6 @@
 package com.application.skripsiarvan.domain.exercise
 
+import android.util.Log
 import com.application.skripsiarvan.domain.model.ExerciseState
 import com.application.skripsiarvan.domain.model.Person
 
@@ -18,9 +19,11 @@ import com.application.skripsiarvan.domain.model.Person
 class SquatDetector : ExerciseDetector {
 
     companion object {
+        private const val TAG = "SquatDetector"
+        
         // Threshold sudut lutut untuk deteksi
         private const val ANGLE_THRESHOLD_UP = 160.0    // Posisi berdiri (lutut lurus)
-        private const val ANGLE_THRESHOLD_DOWN = 100.0  // Posisi squat (lutut ditekuk)
+        private const val ANGLE_THRESHOLD_DOWN = 120.0  // Posisi squat (lutut ditekuk) - lebih santai
         
         // Hysteresis untuk menghindari false positives
         private const val HYSTERESIS = 10.0
@@ -38,12 +41,19 @@ class SquatDetector : ExerciseDetector {
     }
 
     override fun analyzeFrame(person: Person?): ExerciseState {
-        if (person == null) return ExerciseState.IDLE
+        if (person == null) {
+            Log.d(TAG, "❌ Person is null - no pose detected")
+            return ExerciseState.IDLE
+        }
 
         val kneeAngle = AngleCalculator.getAverageKneeAngle(person)
-        if (kneeAngle == null) return ExerciseState.IDLE
+        if (kneeAngle == null) {
+            Log.d(TAG, "❌ Knee angle is null - keypoints not detected or low confidence")
+            return ExerciseState.IDLE
+        }
 
         lastAngle = kneeAngle
+        Log.d(TAG, "📐 Knee angle: %.1f° | State: %s".format(kneeAngle, currentState.name))
         val exerciseState: ExerciseState
 
         when (currentState) {
@@ -86,6 +96,7 @@ class SquatDetector : ExerciseDetector {
                     // Kembali ke posisi berdiri - 1 repetisi selesai!
                     currentState = SquatState.STANDING
                     repetitionCount++
+                    Log.d(TAG, "✅ REP COMPLETED! Total: $repetitionCount")
                     exerciseState = ExerciseState.COMPLETED
                 } else if (kneeAngle < ANGLE_THRESHOLD_DOWN) {
                     // Turun lagi sebelum berdiri penuh
