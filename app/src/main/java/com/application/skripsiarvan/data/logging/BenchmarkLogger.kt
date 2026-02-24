@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.application.skripsiarvan.domain.model.BenchmarkMetrics
 import java.io.File
 import java.io.FileOutputStream
@@ -120,6 +121,7 @@ class BenchmarkLogger(private val context: Context) {
     /**
      * Export menggunakan MediaStore API untuk Android 10+
      */
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun exportWithMediaStore(fileName: String): String? {
         val contentValues = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, fileName)
