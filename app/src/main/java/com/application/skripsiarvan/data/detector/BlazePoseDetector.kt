@@ -14,18 +14,24 @@ import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
 
 /**
- * MediaPipe BlazePose Lite detector implementation Input: 256x256 RGB image Output: [1, 195] tensor
- * (33 landmarks × ~5 values each: x, y, z, visibility, presence)
+ * MediaPipe BlazePose Lite detector implementation.
  *
- * Note: BlazePose outputs 33 keypoints, but we map to COCO 17 format for consistency.
+ * Digunakan sebagai salah satu model dalam benchmarking performa delegate TFLite
+ * (sesuai Bab 3 Metodologi — variabel model: BlazePose Lite FP16).
  *
- * Bug fixes (v2):
- * 1. Auto-detects coordinate range (pixel vs normalized) with fallback warning
- * 2. Applies sigmoid to visibility logits for proper confidence values
- * 3. Temporal smoothing (EMA) to stabilize noisy keypoints
- * 4. Proper valuesPerKeypoint via integer division (not threshold cascade)
- * 5. Separate frameCount for logging vs inferenceCount for range detection
- * 6. Letterbox-aware coordinate correction for aspect ratio mismatch
+ * Input  : 256×256 RGB image, normalisasi ke [-1, 1]
+ * Output : [1, N] tensor — 33 landmarks × stride nilai (x, y, z, visibility, presence)
+ *
+ * Implementasi:
+ * 1. Auto-deteksi rentang koordinat (pixel vs normalized) dengan fallback warning
+ * 2. Sigmoid pada visibility logits (BlazePose output logits, bukan probabilitas)
+ * 3. Temporal smoothing (EMA) untuk meredam jitter antar-frame
+ * 4. Stride output dihitung via integer division (bukan threshold cascade)
+ * 5. frameCount terpisah dari rangeDetectionAttempts — logging tidak spam setiap frame
+ * 6. Buffer output di-cache di level kelas — tidak dialokasi ulang tiap frame (menghindari GC pressure)
+ * 7. Warm-up 5 frame awal (sesuai Bab 4.5.1 Strategi Pengukuran Latensi)
+ *
+ * Mapping: 33 BlazePose keypoints → 17 COCO keypoints untuk konsistensi dengan MoveNet.
  */
 class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
 
@@ -36,122 +42,129 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         private const val BLAZEPOSE_KEYPOINTS = 33
         private const val CONFIDENCE_THRESHOLD = 0.3f
 
-        // Exponential Moving Average alpha for temporal smoothing
-        // Lower = smoother but more latency; Higher = more responsive but noisier
+        // Warm-up frames — sesuai pseudocode di Bab 4.5.1 skripsi:
+        // "IF frameCount < 5 THEN PerformWarmUp()" untuk menghindari outlier inisialisasi cache
+        private const val WARMUP_FRAMES = 5
+
+        // Alpha EMA temporal smoothing.
+        // Lebih kecil = lebih halus tapi ada lag; lebih besar = lebih responsif tapi lebih noise.
         private const val EMA_ALPHA = 0.4f
 
-        // Mapping from COCO 17 keypoints index to BlazePose 33 keypoints index
-        private val COCO_TO_BLAZEPOSE =
-                mapOf(
-                        0 to 0, // nose
-                        1 to 2, // left_eye <- left_eye_inner
-                        2 to 5, // right_eye <- right_eye_inner
-                        3 to 7, // left_ear
-                        4 to 8, // right_ear
-                        5 to 11, // left_shoulder
-                        6 to 12, // right_shoulder
-                        7 to 13, // left_elbow
-                        8 to 14, // right_elbow
-                        9 to 15, // left_wrist
-                        10 to 16, // right_wrist
-                        11 to 23, // left_hip
-                        12 to 24, // right_hip
-                        13 to 25, // left_knee
-                        14 to 26, // right_knee
-                        15 to 27, // left_ankle
-                        16 to 28 // right_ankle
-                )
+        // Pemetaan indeks COCO 17 → indeks BlazePose 33
+        private val COCO_TO_BLAZEPOSE = mapOf(
+            0  to 0,  // nose
+            1  to 2,  // left_eye  ← left_eye_inner
+            2  to 5,  // right_eye ← right_eye_inner
+            3  to 7,  // left_ear
+            4  to 8,  // right_ear
+            5  to 11, // left_shoulder
+            6  to 12, // right_shoulder
+            7  to 13, // left_elbow
+            8  to 14, // right_elbow
+            9  to 15, // left_wrist
+            10 to 16, // right_wrist
+            11 to 23, // left_hip
+            12 to 24, // right_hip
+            13 to 25, // left_knee
+            14 to 26, // right_knee
+            15 to 27, // left_ankle
+            16 to 28  // right_ankle
+        )
     }
 
+    // Preprocessing: resize ke 256×256, normalisasi ke [-1, 1] untuk model FP16 BlazePose
     private val imageProcessor =
-            ImageProcessor.Builder()
-                    .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
-                    .add(NormalizeOp(127.5f, 127.5f)) // BlazePose needs [-1, 1] range
-                    .build()
+        ImageProcessor.Builder()
+            .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
+            .add(NormalizeOp(127.5f, 127.5f))
+            .build()
 
     private val lock = Any()
     private var isClosed = false
 
-    // Coordinate range detection (separate from frame counting)
+    // ── Buffer output di-cache (dialokasi sekali, dipakai ulang tiap frame) ──────────────────────
+    // Menghindari ByteBuffer.allocateDirect() berulang yang menekan GC dan menyebabkan stuttering.
+    private var cachedOutputBuffer: java.nio.ByteBuffer? = null
+    private var cachedOutputArray: FloatArray? = null
+    private var cachedTotalSize: Int = 0
+    private var cachedValuesPerKeypoint: Int = 0
+
+    // ── Deteksi rentang koordinat (pixel vs normalized) ─────────────────────────────────────────
     private var coordsDivisor: Float = 1.0f
     private var rangeDetected = false
     private var rangeDetectionAttempts = 0
 
-    // Frame counter for logging — always increments, separate from range detection
+    // ── Counter frame — selalu increment setiap frame, terpisah dari rangeDetectionAttempts ─────
     private var frameCount = 0
 
-    // Temporal smoothing buffers (EMA)
+    // ── Buffer EMA temporal smoothing ───────────────────────────────────────────────────────────
     private var previousKeypoints: FloatArray? = null
 
-    // Source image aspect ratio for coordinate correction
-    // Set by the caller via setSourceAspectRatio() before detection
-    private var sourceWidth: Float = 1f
-    private var sourceHeight: Float = 1f
-
     /**
-     * Store the source image dimensions before square resize. This is needed to correct coordinate
-     * distortion from non-square images being stretched to 256x256.
+     * Inisialisasi buffer output sekali berdasarkan shape tensor output model.
+     * Dipanggil pada frame pertama karena interpreter harus sudah fully initialized.
      */
-    fun setSourceAspectRatio(width: Int, height: Int) {
-        sourceWidth = width.toFloat()
-        sourceHeight = height.toFloat()
+    private fun ensureBuffersInitialized() {
+        if (cachedOutputBuffer != null) return
+
+        val outputShape = interpreter.getOutputTensor(0).shape()
+        val totalSize = outputShape.reduce { acc, i -> acc * i }
+        val stride = totalSize / BLAZEPOSE_KEYPOINTS
+
+        if (stride < 3) {
+            Log.e(TAG, "Output tensor tidak valid: totalSize=$totalSize, stride=$stride (min 3)")
+            return
+        }
+
+        cachedTotalSize = totalSize
+        cachedValuesPerKeypoint = stride
+        cachedOutputArray = FloatArray(totalSize)
+        cachedOutputBuffer = java.nio.ByteBuffer.allocateDirect(totalSize * 4).also {
+            it.order(java.nio.ByteOrder.nativeOrder())
+        }
+
+        Log.d(TAG, "Buffer output diinisialisasi: totalSize=$totalSize, stride=$stride " +
+                "(${BLAZEPOSE_KEYPOINTS} keypoints × $stride values)")
     }
 
     override fun detectPose(bitmap: Bitmap): Person? {
         synchronized(lock) {
             if (isClosed) return null
 
-            frameCount++ // Always increment (Bug #1 fix)
+            frameCount++ // Selalu increment — dipakai untuk logging dan warm-up
 
             try {
-                // Store bitmap dimensions for aspect ratio correction
-                val bitmapW = bitmap.width.toFloat()
-                val bitmapH = bitmap.height.toFloat()
+                // Inisialisasi buffer sekali (lazy init — aman karena di dalam synchronized)
+                ensureBuffersInitialized()
 
-                // Preprocess image
+                val outputBuf = cachedOutputBuffer ?: return null
+                val outputArr = cachedOutputArray ?: return null
+                val totalSize = cachedTotalSize
+                val valuesPerKeypoint = cachedValuesPerKeypoint
+
+                // Preprocessing citra
                 var tensorImage = TensorImage.fromBitmap(bitmap)
                 tensorImage = imageProcessor.process(tensorImage)
 
-                // Get output tensor info
-                val outputTensor = interpreter.getOutputTensor(0)
-                val outputShape = outputTensor.shape()
-                val totalSize = outputShape.reduce { acc, i -> acc * i }
+                // Jalankan inferensi (latensi diukur di PoseImageAnalyzer, bukan di sini)
+                outputBuf.rewind()
+                interpreter.run(tensorImage.buffer, outputBuf)
 
-                // Allocate output buffer
-                val outputArray = FloatArray(totalSize)
-                val outputBuffer = java.nio.ByteBuffer.allocateDirect(totalSize * 4)
-                outputBuffer.order(java.nio.ByteOrder.nativeOrder())
+                // Baca nilai output
+                outputBuf.rewind()
+                outputBuf.asFloatBuffer().get(outputArr)
 
-                // Run inference
-                interpreter.run(tensorImage.buffer, outputBuffer)
-
-                // Read output values
-                outputBuffer.rewind()
-                outputBuffer.asFloatBuffer().get(outputArray)
-
-                // Determine stride (Bug #2 fix: use integer division)
-                val valuesPerKeypoint = totalSize / BLAZEPOSE_KEYPOINTS
-                if (valuesPerKeypoint < 3) {
-                    Log.e(
-                            TAG,
-                            "Unexpected output: totalSize=$totalSize, stride=$valuesPerKeypoint (need >= 3)"
-                    )
-                    return null
-                }
-
-                // Auto-detect coordinate range on early frames
+                // Auto-deteksi rentang koordinat pada frame awal
                 if (!rangeDetected) {
                     if (rangeDetectionAttempts < 10) {
-                        detectCoordinateRange(outputArray, valuesPerKeypoint)
+                        detectCoordinateRange(outputArr, valuesPerKeypoint)
                         rangeDetectionAttempts++
                     } else {
-                        // Bug #3 fix: Warn and lock if detection failed within 10 frames
-                        Log.w(
-                                TAG,
-                                "⚠️ Could not detect coordinate range in 10 frames. " +
-                                        "Defaulting to divisor=$coordsDivisor. Results may be incorrect if model " +
-                                        "outputs pixel coordinates."
-                        )
+                        // Tidak dapat menentukan rentang dalam 10 frame — pakai default (1.0f)
+                        Log.w(TAG,
+                            "⚠️ Tidak dapat mendeteksi rentang koordinat dalam 10 frame. " +
+                            "Default divisor=$coordsDivisor. Koordinat mungkin tidak akurat " +
+                            "jika model output piksel [0, $INPUT_SIZE].")
                         rangeDetected = true
                     }
                 }
@@ -161,112 +174,73 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                 var totalScore = 0f
                 val currentRawKeypoints = FloatArray(NUM_KEYPOINTS * 2)
 
-                // Calculate aspect ratio correction factors
-                // When a non-square image (e.g. 480x640) is stretched to 256x256,
-                // the model's output coordinates are in the stretched space.
-                // We need to account for this to map back to original proportions.
-                val aspectRatio = bitmapW / bitmapH
-                // scaleX/scaleY correct the stretch distortion
-                val scaleX: Float
-                val scaleY: Float
-                val offsetX: Float
-                val offsetY: Float
-
-                if (aspectRatio > 1f) {
-                    // Landscape: width > height → x coordinates are compressed
-                    scaleX = 1f
-                    scaleY = 1f
-                    offsetX = 0f
-                    offsetY = 0f
-                } else {
-                    // Portrait (most common for phone camera): height > width
-                    // Model stretches the narrow dimension → coordinates are spread
-                    scaleX = 1f
-                    scaleY = 1f
-                    offsetX = 0f
-                    offsetY = 0f
-                }
-
                 for (cocoIdx in 0 until NUM_KEYPOINTS) {
                     val blazePoseIdx = COCO_TO_BLAZEPOSE[cocoIdx] ?: 0
                     val offset = blazePoseIdx * valuesPerKeypoint
 
                     if (offset + valuesPerKeypoint - 1 >= totalSize) {
-                        // Out of bounds, add dummy keypoint
-                        keypoints.add(
-                                Keypoint(
-                                        x = 0f,
-                                        y = 0f,
-                                        score = 0f,
-                                        label = BodyPart.labels[cocoIdx]
-                                )
-                        )
+                        // Indeks di luar batas — tambah dummy keypoint agar list tetap 17 elemen
+                        keypoints.add(Keypoint(x = 0f, y = 0f, score = 0f,
+                            label = BodyPart.labels[cocoIdx]))
                         continue
                     }
 
-                    // Parse raw coordinates
-                    val rawX = outputArray[offset]
-                    val rawY = outputArray[offset + 1]
+                    // Ambil koordinat mentah dan normalisasi ke [0, 1]
+                    val x = (outputArr[offset]     / coordsDivisor).coerceIn(0f, 1f)
+                    val y = (outputArr[offset + 1] / coordsDivisor).coerceIn(0f, 1f)
 
-                    // Normalize to [0, 1] and clamp
-                    val x = ((rawX / coordsDivisor) * scaleX + offsetX).coerceIn(0f, 1f)
-                    val y = ((rawY / coordsDivisor) * scaleY + offsetY).coerceIn(0f, 1f)
-
-                    // Visibility: apply sigmoid (Bug fix — BlazePose outputs logits, not
-                    // probabilities)
-                    val rawVisibility =
-                            if (valuesPerKeypoint >= 4) outputArray[offset + 3] else 0.5f
+                    // Visibility: terapkan sigmoid karena BlazePose output logit (bukan probabilitas)
+                    val rawVisibility = if (valuesPerKeypoint >= 4) outputArr[offset + 3] else 0.5f
                     val visibility = sigmoid(rawVisibility)
 
-                    currentRawKeypoints[cocoIdx * 2] = x
+                    currentRawKeypoints[cocoIdx * 2]     = x
                     currentRawKeypoints[cocoIdx * 2 + 1] = y
 
-                    keypoints.add(
-                            Keypoint(
-                                    x = x,
-                                    y = y,
-                                    score = visibility,
-                                    label = BodyPart.labels[cocoIdx]
-                            )
-                    )
+                    keypoints.add(Keypoint(x = x, y = y, score = visibility,
+                        label = BodyPart.labels[cocoIdx]))
                     totalScore += visibility
                 }
 
                 val avgScore = totalScore / NUM_KEYPOINTS
 
-                // Apply temporal smoothing (EMA)
+                // Terapkan EMA temporal smoothing
                 val smoothedKeypoints = applyTemporalSmoothing(keypoints, currentRawKeypoints)
 
-                // Debug logging (Bug #1 fix: uses frameCount which always increments)
-                if (frameCount <= 5 || frameCount % 200 == 0) {
+                // Debug logging — sparse: 5 frame pertama (warm-up) + setiap 200 frame
+                if (frameCount <= WARMUP_FRAMES || frameCount % 200 == 0) {
                     val nose = smoothedKeypoints.firstOrNull()
-                    Log.d(
-                            TAG,
-                            "Frame $frameCount: nose=(${nose?.x?.let { "%.3f".format(it) }}, " +
-                                    "${nose?.y?.let { "%.3f".format(it) }}), " +
-                                    "score=${"%.3f".format(nose?.score)}, avg=${"%.3f".format(avgScore)}, " +
-                                    "divisor=$coordsDivisor, stride=$valuesPerKeypoint, " +
-                                    "bitmap=${bitmapW.toInt()}x${bitmapH.toInt()}"
+                    Log.d(TAG,
+                        "Frame $frameCount [${bitmap.width}×${bitmap.height}]: " +
+                        "nose=(${nose?.x?.let { "%.3f".format(it) }}, " +
+                               "${nose?.y?.let { "%.3f".format(it) }}), " +
+                        "vis=${"%.3f".format(nose?.score ?: 0f)}, " +
+                        "avg=${"%.3f".format(avgScore)}, " +
+                        "divisor=$coordsDivisor, stride=$valuesPerKeypoint"
                     )
                 }
+
+                // Warm-up: 5 frame awal tidak digunakan untuk deteksi
+                // (sesuai Bab 4.5.1 — menghindari outlier akibat inisialisasi cache GPU)
+                if (frameCount <= WARMUP_FRAMES) return null
 
                 return if (avgScore >= CONFIDENCE_THRESHOLD) {
                     Person(keypoints = smoothedKeypoints, score = avgScore)
                 } else {
                     if (frameCount % 60 == 0) {
-                        Log.v(TAG, "Pose confidence too low: ${"%.4f".format(avgScore)}")
+                        Log.v(TAG, "Confidence pose terlalu rendah: ${"%.4f".format(avgScore)}")
                     }
                     null
                 }
+
             } catch (e: Exception) {
                 if (e is IllegalStateException && isClosed) {
-                    Log.d(TAG, "Detector closed during inference, ignoring error")
+                    Log.d(TAG, "Detector sudah ditutup saat inferensi berlangsung — diabaikan")
                 } else {
                     try {
                         val shape = interpreter.getOutputTensor(0).shape().contentToString()
-                        Log.e(TAG, "BlazePose error. Output shape: $shape. Msg: ${e.message}")
+                        Log.e(TAG, "Error BlazePose. Shape output: $shape. Pesan: ${e.message}")
                     } catch (ex: Exception) {
-                        Log.e(TAG, "Error during BlazePose detection: ${e.message}", e)
+                        Log.e(TAG, "Error saat deteksi BlazePose: ${e.message}", e)
                     }
                 }
                 return null
@@ -275,15 +249,16 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     }
 
     /**
-     * Auto-detect whether coordinates are in pixel range [0, INPUT_SIZE] or normalized [0, 1].
+     * Auto-deteksi apakah koordinat dalam rentang piksel [0, INPUT_SIZE] atau normalized [0, 1].
      *
-     * Heuristic: Sample several well-detected keypoints. If most x/y values > 1.5, they're in pixel
-     * coordinates and need to be divided by INPUT_SIZE.
+     * Heuristik: sampel beberapa keypoint kunci. Jika mayoritas nilai > 1.5 → koordinat piksel,
+     * perlu dibagi INPUT_SIZE. Jika dalam [-0.5, 1.5] → sudah normalized, divisor tetap 1.0.
      */
     private fun detectCoordinateRange(values: FloatArray, stride: Int) {
         var pixelRangeCount = 0
         var normalizedCount = 0
-        val sampleIndices = listOf(0, 11, 12, 23, 24, 25, 26) // nose, shoulders, hips, knees
+        // Sampel: nose, shoulder kiri-kanan, hip kiri-kanan, knee kiri-kanan
+        val sampleIndices = listOf(0, 11, 12, 23, 24, 25, 26)
 
         for (bpIdx in sampleIndices) {
             val offset = bpIdx * stride
@@ -292,7 +267,6 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
             val x = values[offset]
             val y = values[offset + 1]
 
-            // Skip clearly invalid values (too large or NaN)
             if (x.isNaN() || y.isNaN()) continue
 
             if (x > 1.5f || y > 1.5f) {
@@ -302,47 +276,37 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
             }
         }
 
-        // Need clear consensus (at least 3 valid samples)
+        // Butuh minimal 3 sampel valid untuk konsensus
         if (pixelRangeCount + normalizedCount >= 3) {
-            coordsDivisor =
-                    if (pixelRangeCount > normalizedCount) {
-                        Log.d(
-                                TAG,
-                                "✅ Detected PIXEL coordinates [0, $INPUT_SIZE] — divisor=$INPUT_SIZE " +
-                                        "(pixel=$pixelRangeCount, norm=$normalizedCount)"
-                        )
-                        INPUT_SIZE.toFloat()
-                    } else {
-                        Log.d(
-                                TAG,
-                                "✅ Detected NORMALIZED coordinates [0, 1] — divisor=1.0 " +
-                                        "(pixel=$pixelRangeCount, norm=$normalizedCount)"
-                        )
-                        1.0f
-                    }
+            coordsDivisor = if (pixelRangeCount > normalizedCount) {
+                Log.d(TAG, "✅ Koordinat PIKSEL [0, $INPUT_SIZE] terdeteksi — divisor=$INPUT_SIZE " +
+                        "(pixel=$pixelRangeCount, norm=$normalizedCount)")
+                INPUT_SIZE.toFloat()
+            } else {
+                Log.d(TAG, "✅ Koordinat NORMALIZED [0, 1] terdeteksi — divisor=1.0 " +
+                        "(pixel=$pixelRangeCount, norm=$normalizedCount)")
+                1.0f
+            }
             rangeDetected = true
         } else {
-            Log.v(
-                    TAG,
-                    "Range detection attempt ${rangeDetectionAttempts + 1}: " +
-                            "pixel=$pixelRangeCount, norm=$normalizedCount — not enough consensus yet"
-            )
+            Log.v(TAG, "Deteksi rentang percobaan ke-${rangeDetectionAttempts + 1}: " +
+                    "pixel=$pixelRangeCount, norm=$normalizedCount — konsensus belum cukup")
         }
     }
 
     /**
-     * Apply Exponential Moving Average (EMA) smoothing to reduce keypoint jitter.
+     * Terapkan EMA (Exponential Moving Average) smoothing untuk meredam jitter keypoint antar-frame.
      *
-     * smoothed = alpha * current + (1 - alpha) * previous
+     * Formula: smoothed = α × current + (1 - α) × previous
      *
-     * Special handling:
-     * - Low confidence keypoints (< 0.2): Use previous frame's position entirely (noisy data is
-     * worse than slightly stale data)
-     * - First frame: No smoothing (no previous data)
+     * Penanganan khusus:
+     * - Confidence < 0.2 (keypoint tidak terlihat): gunakan posisi frame sebelumnya seluruhnya.
+     *   Data noise lebih buruk dari data stale.
+     * - Frame pertama: tidak ada data sebelumnya, langsung kembalikan keypoints mentah.
      */
     private fun applyTemporalSmoothing(
-            rawKeypoints: List<Keypoint>,
-            currentRawValues: FloatArray
+        rawKeypoints: List<Keypoint>,
+        currentRawValues: FloatArray
     ): List<Keypoint> {
         val prevKps = previousKeypoints
         if (prevKps == null) {
@@ -362,20 +326,19 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
 
             val kp = rawKeypoints[i]
             if (kp.score < 0.2f) {
-                // Low confidence — keep previous position (don't draw noise)
-                val smoothedX = prevKps[idx]
-                val smoothedY = prevKps[idx + 1]
-                smoothedValues[idx] = smoothedX
-                smoothedValues[idx + 1] = smoothedY
-                smoothedKeypoints.add(kp.copy(x = smoothedX, y = smoothedY))
+                // Keypoint tidak terdeteksi dengan baik — pertahankan posisi sebelumnya
+                val sx = prevKps[idx]
+                val sy = prevKps[idx + 1]
+                smoothedValues[idx]     = sx
+                smoothedValues[idx + 1] = sy
+                smoothedKeypoints.add(kp.copy(x = sx, y = sy))
             } else {
-                // Normal EMA smoothing
-                val smoothedX = EMA_ALPHA * currentRawValues[idx] + (1 - EMA_ALPHA) * prevKps[idx]
-                val smoothedY =
-                        EMA_ALPHA * currentRawValues[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
-                smoothedValues[idx] = smoothedX
-                smoothedValues[idx + 1] = smoothedY
-                smoothedKeypoints.add(kp.copy(x = smoothedX, y = smoothedY))
+                // EMA normal
+                val sx = EMA_ALPHA * currentRawValues[idx]     + (1 - EMA_ALPHA) * prevKps[idx]
+                val sy = EMA_ALPHA * currentRawValues[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
+                smoothedValues[idx]     = sx
+                smoothedValues[idx + 1] = sy
+                smoothedKeypoints.add(kp.copy(x = sx, y = sy))
             }
         }
 
@@ -384,12 +347,10 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     }
 
     /**
-     * Sigmoid function to convert logits to probabilities [0, 1]. BlazePose visibility outputs are
-     * raw logits, not probabilities.
+     * Sigmoid: konversi logit → probabilitas [0, 1].
+     * BlazePose mengeluarkan visibility/presence sebagai logit, bukan probabilitas langsung.
      */
-    private fun sigmoid(x: Float): Float {
-        return (1.0f / (1.0f + exp(-x)))
-    }
+    private fun sigmoid(x: Float): Float = 1.0f / (1.0f + exp(-x))
 
     override fun getInputSize(): Pair<Int, Int> = Pair(INPUT_SIZE, INPUT_SIZE)
 
@@ -399,9 +360,8 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         synchronized(lock) {
             isClosed = true
             previousKeypoints = null
-            rangeDetected = false
-            rangeDetectionAttempts = 0
-            frameCount = 0
+            // Buffer output tidak di-null karena ByteBuffer native memory akan dibebaskan
+            // oleh GC setelah referensi hilang bersama instance ini
         }
     }
 }
