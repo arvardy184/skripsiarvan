@@ -40,11 +40,10 @@ class ResourceProfiler(private val context: Context) {
         return try {
             val pid = Process.myPid()
 
-            // Baca total CPU time dari /proc/stat
-            // Catatan: Di Android 8.0+ (Oreo), akses ke /proc/stat dibatasi (EACCES)
+
             val statFile = java.io.File("/proc/stat")
             if (!statFile.exists() || !statFile.canRead()) {
-                // Fallback: Gunakan App CPU time saja jika global tidak bisa dibaca
+
                 return getAppCpuUsageFallback()
             }
 

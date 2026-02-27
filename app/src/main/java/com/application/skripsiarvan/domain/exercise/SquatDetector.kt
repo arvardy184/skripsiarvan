@@ -38,9 +38,9 @@ class SquatDetector : ExerciseDetector {
 
         // Thresholds (relaxed for BlazePose compatibility)
         private const val ANGLE_STAND_ENTER =
-                160.0 // Masuk fase berdiri (tidak harus lock-out sempurna)
+                160.0
         private const val ANGLE_STAND_EXIT =
-                145.0 // Toleransi mulai menekuk (lowered for sensitivity)
+                145.0
 
         private const val ANGLE_SQUAT_ENTER = 110.0 // Parallel Squat (lebih toleran dari 100°)
         private const val ANGLE_SQUAT_EXIT = 120.0 // Toleransi mulai naik
