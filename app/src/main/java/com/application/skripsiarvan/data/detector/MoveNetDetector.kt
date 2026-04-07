@@ -90,11 +90,82 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
     // Format: [cocoIdx*2] = x, [cocoIdx*2+1] = y (17 keypoints × 2 koordinat = 34 nilai)
     private var previousKeypoints: FloatArray? = null
 
+    // ── Validasi model dijalankan sekali ────────────────────────────────────────────────────────
+    private var modelValidated = false
+
+    /**
+     * Validasi bahwa model yang dimuat sesuai spesifikasi MoveNet Lightning SinglePose.
+     *
+     * Spesifikasi yang diharapkan:
+     *   Input  : [1, 192, 192, 3] UINT8 (INT8) atau FLOAT32
+     *   Output : [1, 1, 17, 3] FLOAT32 — singlepose, 17 COCO keypoints, [y, x, score]
+     *
+     * Multipose MoveNet outputnya berbeda: [1, 6, 56] — BUKAN yang kita pakai.
+     * Log dengan tag "MoveNetDetector", filter: adb logcat -s MoveNetDetector
+     */
+    private fun validateModel() {
+        if (modelValidated) return
+        modelValidated = true
+
+        val sep = "─".repeat(60)
+        Log.i(TAG, sep)
+        Log.i(TAG, "  VALIDASI MODEL: MoveNet Lightning SinglePose INT8")
+        Log.i(TAG, sep)
+
+        // ── Input tensor ─────────────────────────────────────────────────────
+        try {
+            val inputShape = interpreter.getInputTensor(0).shape()
+            val inputType  = interpreter.getInputTensor(0).dataType()
+            val inputOk    = inputShape.contentEquals(intArrayOf(1, INPUT_SIZE, INPUT_SIZE, 3))
+            Log.i(TAG, "  Input  : shape=${inputShape.contentToString()}, type=$inputType")
+            if (inputOk) {
+                Log.i(TAG, "  Input  : ✓ sesuai [1, $INPUT_SIZE, $INPUT_SIZE, 3]")
+            } else {
+                Log.w(TAG, "  Input  : ⚠️ TIDAK SESUAI — expected [1, $INPUT_SIZE, $INPUT_SIZE, 3]. " +
+                    "Apakah ini benar-benar MoveNet Lightning 192×192?")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "  Input  : ⛔ Gagal baca tensor input: ${e.message}")
+        }
+
+        // ── Output tensor ─────────────────────────────────────────────────────
+        try {
+            val numOutputs  = interpreter.outputTensorCount
+            val outShape    = interpreter.getOutputTensor(0).shape()
+            val outType     = interpreter.getOutputTensor(0).dataType()
+            Log.i(TAG, "  Output : jumlah tensor = $numOutputs")
+            Log.i(TAG, "  Output0: shape=${outShape.contentToString()}, type=$outType")
+
+            // Singlepose: [1, 1, 17, 3]
+            val isSinglePose = outShape.contentEquals(intArrayOf(1, 1, NUM_KEYPOINTS, 3))
+            // Multipose:  [1, 6, 56]
+            val isMultiPose  = outShape.size == 3 && outShape[1] == 6 && outShape[2] == 56
+
+            when {
+                isSinglePose ->
+                    Log.i(TAG, "  Output0: ✓ SINGLEPOSE [1, 1, 17, 3] — [y, x, score] per keypoint (benar)")
+                isMultiPose ->
+                    Log.e(TAG, "  Output0: ⛔ MULTIPOSE [1, 6, 56] terdeteksi! " +
+                        "Kode ini hanya mendukung singlepose. Ganti ke movenet_lightning_int8.tflite")
+                else ->
+                    Log.e(TAG, "  Output0: ⛔ Shape tidak dikenal ${outShape.contentToString()}. " +
+                        "Pastikan file model adalah MoveNet SinglePose Lightning.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "  Output : ⛔ Gagal baca tensor output: ${e.message}")
+        }
+
+        Log.i(TAG, sep)
+    }
+
     override fun detectPose(bitmap: Bitmap): Person? {
         synchronized(lock) {
             if (isClosed) return null
 
             frameCount++
+
+            // Validasi model sekali di frame pertama
+            if (frameCount == 1) validateModel()
 
             try {
                 // Preprocessing citra

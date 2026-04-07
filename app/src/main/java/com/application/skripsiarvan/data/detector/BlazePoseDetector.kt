@@ -121,16 +121,23 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     /**
      * Inisialisasi buffer output sekali berdasarkan shape tensor output model.
      * Dipanggil pada frame pertama karena interpreter harus sudah fully initialized.
+     *
+     * Sekaligus melakukan validasi model untuk memastikan file .tflite yang dimuat
+     * benar-benar BlazePose Lite dengan spesifikasi yang diharapkan.
      */
     private fun ensureBuffersInitialized() {
         if (cachedOutputBuffer != null) return
+
+        // ── Validasi model ────────────────────────────────────────────────────────────────────────
+        validateModel()
 
         val outputShape = interpreter.getOutputTensor(0).shape()
         val totalSize = outputShape.reduce { acc, i -> acc * i }
         val stride = totalSize / BLAZEPOSE_KEYPOINTS
 
         if (stride < 3) {
-            Log.e(TAG, "Output tensor tidak valid: totalSize=$totalSize, stride=$stride (min 3)")
+            Log.e(TAG, "⛔ Output tensor tidak valid: totalSize=$totalSize, stride=$stride (min 3). " +
+                "Pastikan file blazepose_lite_fp16.tflite yang dipakai benar.")
             return
         }
 
@@ -152,9 +159,9 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                     globalPresenceBuffer = java.nio.ByteBuffer.allocateDirect(presenceSize * 4)
                         .also { it.order(java.nio.ByteOrder.nativeOrder()) }
                     hasGlobalPresenceTensor = true
-                    Log.d(TAG, "Global presence tensor ditemukan: shape=${presenceShape.contentToString()}")
+                    Log.d(TAG, "  Global presence tensor: shape=${presenceShape.contentToString()} ✓")
                 } else {
-                    Log.d(TAG, "Model tidak memiliki global presence tensor — filter per-keypoint saja")
+                    Log.d(TAG, "  Global presence tensor: tidak ada — filter per-keypoint saja")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Gagal cek global presence tensor: ${e.message}")
@@ -162,7 +169,80 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         }
 
         Log.d(TAG, "Buffer output diinisialisasi: totalSize=$totalSize, stride=$stride " +
-                "(${BLAZEPOSE_KEYPOINTS} keypoints × $stride values)")
+                "(${BLAZEPOSE_KEYPOINTS} kp × $stride values/kp)")
+    }
+
+    /**
+     * Validasi bahwa model yang dimuat sesuai spesifikasi BlazePose Lite.
+     *
+     * Spesifikasi yang diharapkan:
+     *   Input  : [1, 256, 256, 3] FLOAT32, normalisasi [-1, 1]
+     *   Output : tensor dengan totalSize = 33 × N  (N = 3..6 tergantung varian)
+     *            Varian umum: N=5 → [x, y, z, visibility, presence]
+     *
+     * Log yang dihasilkan mudah dibaca di Logcat dengan tag "BlazePoseDetector".
+     * Filter: adb logcat -s BlazePoseDetector
+     */
+    private fun validateModel() {
+        val sep = "─".repeat(60)
+        Log.i(TAG, sep)
+        Log.i(TAG, "  VALIDASI MODEL: BlazePose Lite FP16")
+        Log.i(TAG, sep)
+
+        // ── Input tensor ─────────────────────────────────────────────────────
+        try {
+            val inputShape = interpreter.getInputTensor(0).shape()
+            val inputType  = interpreter.getInputTensor(0).dataType()
+            val inputOk    = inputShape.contentEquals(intArrayOf(1, INPUT_SIZE, INPUT_SIZE, 3))
+            Log.i(TAG, "  Input  : shape=${inputShape.contentToString()}, type=$inputType")
+            if (inputOk) {
+                Log.i(TAG, "  Input  : ✓ sesuai [1, $INPUT_SIZE, $INPUT_SIZE, 3] FLOAT32")
+            } else {
+                Log.w(TAG, "  Input  : ⚠️ TIDAK SESUAI — expected [1, $INPUT_SIZE, $INPUT_SIZE, 3]. " +
+                    "Apakah ini benar-benar BlazePose Lite 256×256?")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "  Input  : ⛔ Gagal baca tensor input: ${e.message}")
+        }
+
+        // ── Output tensor(s) ─────────────────────────────────────────────────
+        try {
+            val numOutputs = interpreter.outputTensorCount
+            Log.i(TAG, "  Output : jumlah tensor = $numOutputs")
+
+            val outShape   = interpreter.getOutputTensor(0).shape()
+            val outType    = interpreter.getOutputTensor(0).dataType()
+            val totalSize  = outShape.reduce { acc, i -> acc * i }
+            val stride     = totalSize / BLAZEPOSE_KEYPOINTS
+            val remainder  = totalSize % BLAZEPOSE_KEYPOINTS
+
+            Log.i(TAG, "  Output0: shape=${outShape.contentToString()}, type=$outType")
+            Log.i(TAG, "  Output0: totalSize=$totalSize, stride=$stride (33 kp × $stride values), sisa=$remainder")
+
+            when {
+                remainder != 0 ->
+                    Log.e(TAG, "  Output0: ⛔ totalSize=$totalSize tidak habis dibagi 33. " +
+                        "Ini bukan BlazePose 33-keypoint. Periksa file model!")
+                stride < 3 ->
+                    Log.e(TAG, "  Output0: ⛔ stride=$stride terlalu kecil (min 3 = x,y,z). " +
+                        "Model mungkin salah atau korup.")
+                stride == 3 ->
+                    Log.w(TAG, "  Output0: ⚠️ stride=3 → hanya [x,y,z], tanpa visibility/presence. " +
+                        "Threshold confidence akan kurang akurat.")
+                stride == 4 ->
+                    Log.i(TAG, "  Output0: ✓ stride=4 → [x, y, z, visibility]")
+                stride == 5 ->
+                    Log.i(TAG, "  Output0: ✓ stride=5 → [x, y, z, visibility, presence] (ideal)")
+                stride == 6 ->
+                    Log.i(TAG, "  Output0: ✓ stride=6 → [x, y, z, visibility, presence, + extra]")
+                else ->
+                    Log.w(TAG, "  Output0: ⚠️ stride=$stride tidak dikenal — perlu investigasi")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "  Output : ⛔ Gagal baca tensor output: ${e.message}")
+        }
+
+        Log.i(TAG, sep)
     }
 
     override fun detectPose(bitmap: Bitmap): Person? {
