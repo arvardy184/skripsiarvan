@@ -40,19 +40,26 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         private const val INPUT_SIZE = 256
         private const val NUM_KEYPOINTS = 17
         private const val BLAZEPOSE_KEYPOINTS = 33
-        private const val CONFIDENCE_THRESHOLD = 0.5f
+        // Threshold dinaikkan dari 0.5 ke 0.65 untuk menekan false positive.
+        // sigmoid(0) = 0.5 → nilai 0.5 sama saja tidak menyaring noise sama sekali.
+        // sigmoid^-1(0.65) ≈ 0.62 logit, jadi model harus cukup yakin ada orang.
+        private const val CONFIDENCE_THRESHOLD = 0.65f
 
         // Minimal skor presence per-keypoint agar dianggap benar-benar ada di frame.
-        // sigmoid(0) = 0.5, jadi threshold ini menyaring output noise saat tidak ada orang.
-        private const val PRESENCE_THRESHOLD = 0.5f
+        private const val PRESENCE_THRESHOLD = 0.65f
+
+        // Minimal jumlah keypoint yang harus memiliki score >= MIN_KEYPOINT_SCORE
+        // agar pose dianggap valid. Mencegah deteksi jika hanya beberapa titik terlihat.
+        private const val MIN_VALID_KEYPOINTS = 8
+        private const val MIN_KEYPOINT_SCORE = 0.35f
 
         // Warm-up frames — sesuai pseudocode di Bab 4.5.1 skripsi:
         // "IF frameCount < 5 THEN PerformWarmUp()" untuk menghindari outlier inisialisasi cache
         private const val WARMUP_FRAMES = 5
 
         // Alpha EMA temporal smoothing.
-        // Lebih kecil = lebih halus tapi ada lag; lebih besar = lebih responsif tapi lebih noise.
-        private const val EMA_ALPHA = 0.4f
+        // Dinaikkan dari 0.4 ke 0.6 agar lebih responsif — kurangi lag saat pose bergerak cepat.
+        private const val EMA_ALPHA = 0.6f
 
         // Pemetaan indeks COCO 17 → indeks BlazePose 33
         private val COCO_TO_BLAZEPOSE = mapOf(
@@ -263,6 +270,9 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
 
                 val avgScore = totalScore / NUM_KEYPOINTS
 
+                // Hitung jumlah keypoint yang cukup yakin (score >= MIN_KEYPOINT_SCORE)
+                val validKeypointCount = keypoints.count { it.score >= MIN_KEYPOINT_SCORE }
+
                 // Terapkan EMA temporal smoothing
                 val smoothedKeypoints = applyTemporalSmoothing(keypoints, currentRawKeypoints)
 
@@ -275,6 +285,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                                "${nose?.y?.let { "%.3f".format(it) }}), " +
                         "vis=${"%.3f".format(nose?.score ?: 0f)}, " +
                         "avg=${"%.3f".format(avgScore)}, " +
+                        "validKps=$validKeypointCount/$NUM_KEYPOINTS, " +
                         "divisor=$coordsDivisor, stride=$valuesPerKeypoint"
                     )
                 }
@@ -283,11 +294,15 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                 // (sesuai Bab 4.5.1 — menghindari outlier akibat inisialisasi cache GPU)
                 if (frameCount <= WARMUP_FRAMES) return null
 
-                return if (avgScore >= CONFIDENCE_THRESHOLD) {
+                // Gate: rata-rata score harus >= CONFIDENCE_THRESHOLD DAN
+                // minimal MIN_VALID_KEYPOINTS keypoint harus terlihat dengan baik.
+                // Ini mencegah false positive saat hanya sebagian kecil keypoint terdeteksi.
+                return if (avgScore >= CONFIDENCE_THRESHOLD && validKeypointCount >= MIN_VALID_KEYPOINTS) {
                     Person(keypoints = smoothedKeypoints, score = avgScore)
                 } else {
                     if (frameCount % 60 == 0) {
-                        Log.v(TAG, "Confidence pose terlalu rendah: ${"%.4f".format(avgScore)}")
+                        Log.v(TAG, "Pose tidak valid: avg=${"%.4f".format(avgScore)}, " +
+                            "validKps=$validKeypointCount (min=$MIN_VALID_KEYPOINTS)")
                     }
                     // Reset EMA agar posisi lama tidak "hantu" ke frame berikutnya
                     resetTemporalSmoothing()
@@ -362,8 +377,9 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
      * Formula: smoothed = α × current + (1 - α) × previous
      *
      * Penanganan khusus:
-     * - Confidence < 0.2 (keypoint tidak terlihat): gunakan posisi frame sebelumnya seluruhnya.
-     *   Data noise lebih buruk dari data stale.
+     * - Confidence < 0.3 (keypoint tidak terlihat dengan baik): simpan posisi frame sebelumnya
+     *   di buffer, kembalikan keypoint dengan score=0 agar renderer tidak menampilkannya.
+     *   Ini mencegah keypoint "muncul di tempat salah" karena posisi noise bercampur ke EMA.
      * - Frame pertama: tidak ada data sebelumnya, langsung kembalikan keypoints mentah.
      */
     private fun applyTemporalSmoothing(
@@ -387,17 +403,16 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
             }
 
             val kp = rawKeypoints[i]
-            if (kp.score < 0.2f) {
-                // Keypoint tidak terdeteksi dengan baik.
-                // Gunakan posisi CURRENT (bukan lama) — posisi noise lebih jujur daripada
-                // ghost dari orang yang sudah tidak ada di frame.
-                val sx = currentRawValues[idx]
-                val sy = currentRawValues[idx + 1]
-                smoothedValues[idx]     = sx
-                smoothedValues[idx + 1] = sy
-                smoothedKeypoints.add(kp.copy(x = sx, y = sy))
+            if (kp.score < 0.3f) {
+                // Keypoint tidak terlihat dengan baik — tidak bisa dipercaya posisinya.
+                // Pertahankan posisi sebelumnya di buffer EMA (agar jika keypoint muncul lagi,
+                // smoothing tetap konsisten), tapi kembalikan score=0 ke renderer.
+                smoothedValues[idx]     = prevKps[idx]
+                smoothedValues[idx + 1] = prevKps[idx + 1]
+                // score=0 memberi sinyal ke renderer untuk tidak menampilkan titik ini
+                smoothedKeypoints.add(kp.copy(x = prevKps[idx], y = prevKps[idx + 1], score = 0f))
             } else {
-                // EMA normal
+                // EMA normal — blend posisi current dengan previous
                 val sx = EMA_ALPHA * currentRawValues[idx]     + (1 - EMA_ALPHA) * prevKps[idx]
                 val sy = EMA_ALPHA * currentRawValues[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
                 smoothedValues[idx]     = sx
