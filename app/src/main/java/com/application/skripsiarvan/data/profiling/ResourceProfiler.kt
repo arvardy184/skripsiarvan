@@ -43,7 +43,6 @@ class ResourceProfiler(private val context: Context) {
 
             val statFile = java.io.File("/proc/stat")
             if (!statFile.exists() || !statFile.canRead()) {
-
                 return getAppCpuUsageFallback()
             }
 
@@ -122,7 +121,9 @@ class ResourceProfiler(private val context: Context) {
 
         return if (timeDelta > 0) {
                     val numCores = Runtime.getRuntime().availableProcessors()
-                    (cpuDelta.toFloat() / timeDelta.toFloat()) * 100f
+                    // Normalize by numCores: TFLite uses multiple threads, so raw cpuDelta
+                    // can exceed timeDelta. Divide by numCores to get single-core-equivalent %.
+                    (cpuDelta.toFloat() / (timeDelta.toFloat() * numCores)) * 100f
                 } else {
                     0f
                 }
@@ -184,10 +185,19 @@ class ResourceProfiler(private val context: Context) {
             val voltage = batteryStatus?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0
 
             // Calculate power: P = V * I
-            // currentNow is in microamperes (uA), voltage is in millivolts (mV)
-            // Power = (voltage/1000 V) * (current/1000000 A) = voltage * current / 1000000000 W
-            // Convert to mW: multiply by 1000
-            val powerMw = kotlin.math.abs((voltage.toFloat() * currentNow.toFloat()) / 1_000_000f)
+            // voltage is in millivolts (mV)
+            // BATTERY_PROPERTY_CURRENT_NOW unit is device-dependent:
+            //   - Most devices: microamperes (µA) → divide by 1_000_000 to get A
+            //   - Some devices (Samsung, etc.): milliamperes (mA) → divide by 1_000 to get A
+            // Heuristic: if |currentNow| < 50_000, likely mA; otherwise µA
+            val currentAbs = kotlin.math.abs(currentNow.toFloat())
+            val powerMw = if (currentAbs < 50_000f) {
+                // Treat as mA: P(mW) = V(mV)/1000 * I(mA) = V*I/1000
+                (voltage.toFloat() * currentAbs) / 1_000f
+            } else {
+                // Treat as µA: P(mW) = V(mV)/1000 * I(µA)/1000000 * 1000 = V*I/1_000_000
+                (voltage.toFloat() * currentAbs) / 1_000_000f
+            }
 
             return powerMw
         } catch (e: Exception) {

@@ -40,7 +40,11 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         private const val INPUT_SIZE = 256
         private const val NUM_KEYPOINTS = 17
         private const val BLAZEPOSE_KEYPOINTS = 33
-        private const val CONFIDENCE_THRESHOLD = 0.3f
+        private const val CONFIDENCE_THRESHOLD = 0.5f
+
+        // Minimal skor presence per-keypoint agar dianggap benar-benar ada di frame.
+        // sigmoid(0) = 0.5, jadi threshold ini menyaring output noise saat tidak ada orang.
+        private const val PRESENCE_THRESHOLD = 0.5f
 
         // Warm-up frames — sesuai pseudocode di Bab 4.5.1 skripsi:
         // "IF frameCount < 5 THEN PerformWarmUp()" untuk menghindari outlier inisialisasi cache
@@ -100,6 +104,13 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     // ── Buffer EMA temporal smoothing ───────────────────────────────────────────────────────────
     private var previousKeypoints: FloatArray? = null
 
+    // ── Buffer output tensor ke-1 (global pose presence score, opsional) ────────────────────────
+    // BlazePose TFLite kadang punya output tensor kedua berisi skor kehadiran pose secara global.
+    // Diinisialisasi null; jika model tidak memiliki tensor ke-1, tetap null dan diabaikan.
+    private var globalPresenceBuffer: java.nio.ByteBuffer? = null
+    private var hasGlobalPresenceTensor = false
+    private var globalPresenceChecked = false
+
     /**
      * Inisialisasi buffer output sekali berdasarkan shape tensor output model.
      * Dipanggil pada frame pertama karena interpreter harus sudah fully initialized.
@@ -121,6 +132,26 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         cachedOutputArray = FloatArray(totalSize)
         cachedOutputBuffer = java.nio.ByteBuffer.allocateDirect(totalSize * 4).also {
             it.order(java.nio.ByteOrder.nativeOrder())
+        }
+
+        // Cek apakah model memiliki output tensor ke-1 (global pose presence)
+        if (!globalPresenceChecked) {
+            globalPresenceChecked = true
+            try {
+                val numOutputs = interpreter.outputTensorCount
+                if (numOutputs > 1) {
+                    val presenceShape = interpreter.getOutputTensor(1).shape()
+                    val presenceSize = presenceShape.reduce { acc, i -> acc * i }
+                    globalPresenceBuffer = java.nio.ByteBuffer.allocateDirect(presenceSize * 4)
+                        .also { it.order(java.nio.ByteOrder.nativeOrder()) }
+                    hasGlobalPresenceTensor = true
+                    Log.d(TAG, "Global presence tensor ditemukan: shape=${presenceShape.contentToString()}")
+                } else {
+                    Log.d(TAG, "Model tidak memiliki global presence tensor — filter per-keypoint saja")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Gagal cek global presence tensor: ${e.message}")
+            }
         }
 
         Log.d(TAG, "Buffer output diinisialisasi: totalSize=$totalSize, stride=$stride " +
@@ -148,11 +179,34 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
 
                 // Jalankan inferensi (latensi diukur di PoseImageAnalyzer, bukan di sini)
                 outputBuf.rewind()
-                interpreter.run(tensorImage.buffer, outputBuf)
+                if (hasGlobalPresenceTensor) {
+                    // Jalankan dengan multi-output agar tensor ke-1 juga terisi
+                    val outputs = mapOf(0 to outputBuf, 1 to globalPresenceBuffer!!)
+                    interpreter.runForMultipleInputsOutputs(arrayOf(tensorImage.buffer), outputs)
+                } else {
+                    interpreter.run(tensorImage.buffer, outputBuf)
+                }
 
                 // Baca nilai output
                 outputBuf.rewind()
                 outputBuf.asFloatBuffer().get(outputArr)
+
+                // ── Gate 1: Global pose presence (jika tensor ke-1 tersedia) ─────────────────
+                // Ini filter paling awal — jika model sendiri bilang "tidak ada orang",
+                // langsung return null tanpa parsing keypoints sama sekali.
+                if (hasGlobalPresenceTensor) {
+                    val presenceBuf = globalPresenceBuffer!!
+                    presenceBuf.rewind()
+                    val globalPresenceLogit = presenceBuf.asFloatBuffer().get()
+                    val globalPresence = sigmoid(globalPresenceLogit)
+                    if (globalPresence < PRESENCE_THRESHOLD) {
+                        if (frameCount % 30 == 0) {
+                            Log.v(TAG, "Global presence terlalu rendah: ${"%.3f".format(globalPresence)} — tidak ada orang")
+                        }
+                        resetTemporalSmoothing()
+                        return null
+                    }
+                }
 
                 // Auto-deteksi rentang koordinat pada frame awal
                 if (!rangeDetected) {
@@ -189,16 +243,22 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                     val x = (outputArr[offset]     / coordsDivisor).coerceIn(0f, 1f)
                     val y = (outputArr[offset + 1] / coordsDivisor).coerceIn(0f, 1f)
 
-                    // Visibility: terapkan sigmoid karena BlazePose output logit (bukan probabilitas)
+                    // Visibility & Presence: keduanya logit dari BlazePose, perlu sigmoid.
+                    // - visibility (index 3): apakah keypoint terlihat (tidak terhalang)
+                    // - presence  (index 4): apakah keypoint benar-benar ada di frame
+                    // Pakai min keduanya → skor efektif lebih ketat, menekan false positive.
                     val rawVisibility = if (valuesPerKeypoint >= 4) outputArr[offset + 3] else 0.5f
-                    val visibility = sigmoid(rawVisibility)
+                    val rawPresence   = if (valuesPerKeypoint >= 5) outputArr[offset + 4] else rawVisibility
+                    val visibility    = sigmoid(rawVisibility)
+                    val presence      = sigmoid(rawPresence)
+                    val effectiveScore = minOf(visibility, presence)
 
                     currentRawKeypoints[cocoIdx * 2]     = x
                     currentRawKeypoints[cocoIdx * 2 + 1] = y
 
-                    keypoints.add(Keypoint(x = x, y = y, score = visibility,
+                    keypoints.add(Keypoint(x = x, y = y, score = effectiveScore,
                         label = BodyPart.labels[cocoIdx]))
-                    totalScore += visibility
+                    totalScore += effectiveScore
                 }
 
                 val avgScore = totalScore / NUM_KEYPOINTS
@@ -229,6 +289,8 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                     if (frameCount % 60 == 0) {
                         Log.v(TAG, "Confidence pose terlalu rendah: ${"%.4f".format(avgScore)}")
                     }
+                    // Reset EMA agar posisi lama tidak "hantu" ke frame berikutnya
+                    resetTemporalSmoothing()
                     null
                 }
 
@@ -326,9 +388,11 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
 
             val kp = rawKeypoints[i]
             if (kp.score < 0.2f) {
-                // Keypoint tidak terdeteksi dengan baik — pertahankan posisi sebelumnya
-                val sx = prevKps[idx]
-                val sy = prevKps[idx + 1]
+                // Keypoint tidak terdeteksi dengan baik.
+                // Gunakan posisi CURRENT (bukan lama) — posisi noise lebih jujur daripada
+                // ghost dari orang yang sudah tidak ada di frame.
+                val sx = currentRawValues[idx]
+                val sy = currentRawValues[idx + 1]
                 smoothedValues[idx]     = sx
                 smoothedValues[idx + 1] = sy
                 smoothedKeypoints.add(kp.copy(x = sx, y = sy))
@@ -344,6 +408,14 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
 
         previousKeypoints = smoothedValues
         return smoothedKeypoints
+    }
+
+    /**
+     * Reset buffer EMA agar posisi keypoint orang yang sudah pergi tidak "hantu"
+     * ke frame berikutnya. Dipanggil saat pose tidak terdeteksi.
+     */
+    private fun resetTemporalSmoothing() {
+        previousKeypoints = null
     }
 
     /**

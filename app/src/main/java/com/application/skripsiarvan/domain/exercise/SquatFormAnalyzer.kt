@@ -425,14 +425,13 @@ class SquatFormAnalyzer : FormAnalyzer {
       .coerceIn(0, 100)
   }
 
-  // ─── Message Generation ──────────────────────────────────────────
 
   private fun generatePrimaryMessage(
     checks: List<FormCheck>,
     phase: SquatPhase,
     angle: Double
   ): String {
-    // Find the most critical issue
+
     val worstCheck =
       checks.filter { it.severity != FeedbackSeverity.GOOD }.maxByOrNull {
         if (it.severity == FeedbackSeverity.ERROR) 2 else 1
@@ -458,7 +457,7 @@ class SquatFormAnalyzer : FormAnalyzer {
     }
   }
 
-  // ─── Utility ─────────────────────────────────────────────────────
+
 
   private fun calculateTorsoLean(person: Person): Double? {
     val leftShoulder = person.keypoints.getOrNull(BodyPart.LEFT_SHOULDER)
