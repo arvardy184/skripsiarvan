@@ -13,8 +13,24 @@ import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
 
 /**
- * MoveNet Lightning pose detector implementation Input: 192x192 RGB image Output: [1, 1, 17, 3]
- * tensor (1 person, 17 keypoints, [y, x, score])
+ * MoveNet Lightning pose detector implementation.
+ *
+ * Digunakan sebagai model pembanding (baseline) dalam benchmarking performa delegate TFLite
+ * (sesuai Bab 3 Metodologi — variabel model: MoveNet Lightning INT8/FP32).
+ *
+ * Input  : 192×192 RGB image (INT8 atau FLOAT32)
+ * Output : [1, 1, 17, 3] tensor — 17 COCO keypoints × [y, x, score]
+ *          Koordinat y dan x sudah ternormalisasi ke [0, 1].
+ *
+ * Implementasi dibuat setara dengan BlazePoseDetector untuk keadilan benchmark:
+ * 1. Buffer output di-cache di level kelas — tidak dialokasi ulang tiap frame (menghindari GC pressure)
+ * 2. Warm-up 5 frame awal (sesuai Bab 4.5.1 — menghindari outlier inisialisasi cache)
+ * 3. Temporal smoothing (EMA) α=0.6 — sama dengan BlazePoseDetector
+ * 4. Validasi minimal keypoint valid (MIN_VALID_KEYPOINTS) — sama dengan BlazePoseDetector
+ *
+ * Catatan threshold: CONFIDENCE_THRESHOLD MoveNet (0.3f) ≠ BlazePose (0.65f) karena
+ * output score MoveNet adalah probabilitas langsung [0,1], sedangkan BlazePose mengeluarkan
+ * logit yang perlu sigmoid. Ini adalah perbedaan arsitektur model, bukan ketidakadilan benchmark.
  */
 class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
 
@@ -22,7 +38,26 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
         private const val TAG = "MoveNetDetector"
         private const val INPUT_SIZE = 192
         private const val NUM_KEYPOINTS = 17
+
+        // MoveNet output adalah probabilitas langsung [0, 1], bukan logit.
+        // Threshold 0.3f setara dengan "30% confidence" — ini nilai rekomendasi resmi MoveNet.
+        // BlazePose menggunakan 0.65f karena outputnya adalah sigmoid(logit), bukan probabilitas.
         private const val CONFIDENCE_THRESHOLD = 0.3f
+
+        // Minimal jumlah keypoint valid agar pose dianggap terdeteksi.
+        // Sama dengan BlazePoseDetector (8 dari 17) untuk keadilan benchmark.
+        private const val MIN_VALID_KEYPOINTS = 8
+        // Threshold per-keypoint disesuaikan dengan skala output MoveNet (probabilitas langsung).
+        // Proporsi: MIN_KEYPOINT_SCORE / CONFIDENCE_THRESHOLD ≈ 0.67 (sama dengan BlazePose: 0.35/0.65)
+        private const val MIN_KEYPOINT_SCORE = 0.2f
+
+        // Warm-up 5 frame — sama dengan BlazePoseDetector (Bab 4.5.1 skripsi).
+        // Menghindari outlier latensi akibat inisialisasi cache JIT dan model.
+        private const val WARMUP_FRAMES = 5
+
+        // Alpha EMA temporal smoothing — identik dengan BlazePoseDetector untuk keadilan.
+        // Formula: smoothed = α × current + (1 - α) × previous
+        private const val EMA_ALPHA = 0.6f
     }
 
     private val imageProcessor by lazy {
@@ -30,7 +65,9 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
                 ImageProcessor.Builder()
                         .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
 
-        // Cek apakah model membutuhkan Float atau Byte
+        // MoveNet tersedia dalam varian INT8 dan FLOAT32.
+        // INT8: tidak perlu normalisasi (nilai sudah dalam rentang byte).
+        // FLOAT32: normalisasi ke [0, 1] dengan membagi 255.
         if (interpreter.getInputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
             builder.add(NormalizeOp(0f, 255f))
         }
@@ -41,29 +78,44 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
     private val lock = Any()
     private var isClosed = false
 
+    // ── Counter frame ────────────────────────────────────────────────────────────────────────────
+    private var frameCount = 0
+
+    // ── Buffer output di-cache (dialokasi sekali, dipakai ulang tiap frame) ──────────────────────
+    // Menghindari Array allocation berulang tiap frame yang menyebabkan GC pressure dan stuttering.
+    // Setara dengan strategi caching ByteBuffer di BlazePoseDetector.
+    private val cachedOutput = Array(1) { Array(1) { Array(NUM_KEYPOINTS) { FloatArray(3) } } }
+
+    // ── Buffer EMA temporal smoothing ───────────────────────────────────────────────────────────
+    // Format: [cocoIdx*2] = x, [cocoIdx*2+1] = y (17 keypoints × 2 koordinat = 34 nilai)
+    private var previousKeypoints: FloatArray? = null
+
     override fun detectPose(bitmap: Bitmap): Person? {
         synchronized(lock) {
             if (isClosed) return null
 
+            frameCount++
+
             try {
-                // Preprocess image
+                // Preprocessing citra
                 var tensorImage = TensorImage.fromBitmap(bitmap)
                 tensorImage = imageProcessor.process(tensorImage)
 
-                // Prepare output buffer: [1, 1, 17, 3]
-                val output = Array(1) { Array(1) { Array(NUM_KEYPOINTS) { FloatArray(3) } } }
+                // Jalankan inferensi — buffer di-reuse tiap frame (tidak ada alokasi baru)
+                interpreter.run(tensorImage.buffer, cachedOutput)
 
-                // Run inference
-                interpreter.run(tensorImage.buffer, output)
-
-                // Parse output
+                // Parse output: [1, 1, 17, 3] → [y, x, score] per keypoint
                 val keypoints = mutableListOf<Keypoint>()
                 var totalScore = 0f
+                val currentRawValues = FloatArray(NUM_KEYPOINTS * 2)
 
                 for (i in 0 until NUM_KEYPOINTS) {
-                    val y = output[0][0][i][0] // Normalized y [0-1]
-                    val x = output[0][0][i][1] // Normalized x [0-1]
-                    val score = output[0][0][i][2]
+                    val y     = cachedOutput[0][0][i][0] // Normalized y [0, 1]
+                    val x     = cachedOutput[0][0][i][1] // Normalized x [0, 1]
+                    val score = cachedOutput[0][0][i][2]
+
+                    currentRawValues[i * 2]     = x
+                    currentRawValues[i * 2 + 1] = y
 
                     keypoints.add(Keypoint(x = x, y = y, score = score, label = BodyPart.labels[i]))
                     totalScore += score
@@ -71,21 +123,102 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
 
                 val avgScore = totalScore / NUM_KEYPOINTS
 
-                // Only return if average confidence is above threshold
-                return if (avgScore >= CONFIDENCE_THRESHOLD) {
-                    Person(keypoints = keypoints, score = avgScore)
+                // Hitung jumlah keypoint yang cukup yakin
+                val validKeypointCount = keypoints.count { it.score >= MIN_KEYPOINT_SCORE }
+
+                // Terapkan EMA temporal smoothing — identik dengan BlazePoseDetector
+                val smoothedKeypoints = applyTemporalSmoothing(keypoints, currentRawValues)
+
+                // Debug logging — sparse
+                if (frameCount <= WARMUP_FRAMES || frameCount % 200 == 0) {
+                    val nose = smoothedKeypoints.firstOrNull()
+                    Log.d(TAG,
+                        "Frame $frameCount [${bitmap.width}×${bitmap.height}]: " +
+                        "nose=(${nose?.x?.let { "%.3f".format(it) }}, " +
+                               "${nose?.y?.let { "%.3f".format(it) }}), " +
+                        "score=${"%.3f".format(nose?.score ?: 0f)}, " +
+                        "avg=${"%.3f".format(avgScore)}, " +
+                        "validKps=$validKeypointCount/$NUM_KEYPOINTS"
+                    )
+                }
+
+                // Warm-up: 5 frame awal tidak digunakan — sama dengan BlazePoseDetector
+                if (frameCount <= WARMUP_FRAMES) return null
+
+                // Gate: rata-rata score harus >= CONFIDENCE_THRESHOLD DAN
+                // minimal MIN_VALID_KEYPOINTS keypoint harus cukup yakin.
+                return if (avgScore >= CONFIDENCE_THRESHOLD && validKeypointCount >= MIN_VALID_KEYPOINTS) {
+                    Person(keypoints = smoothedKeypoints, score = avgScore)
                 } else {
+                    if (frameCount % 60 == 0) {
+                        Log.v(TAG, "Pose tidak valid: avg=${"%.4f".format(avgScore)}, " +
+                            "validKps=$validKeypointCount (min=$MIN_VALID_KEYPOINTS)")
+                    }
+                    resetTemporalSmoothing()
                     null
                 }
+
             } catch (e: Exception) {
                 if (e is IllegalStateException && isClosed) {
-                    Log.d(TAG, "Detector closed during inference, ignoring error")
+                    Log.d(TAG, "Detector sudah ditutup saat inferensi berlangsung — diabaikan")
                 } else {
-                    Log.e(TAG, "Error during pose detection", e)
+                    Log.e(TAG, "Error saat deteksi MoveNet: ${e.message}", e)
                 }
                 return null
             }
         }
+    }
+
+    /**
+     * Terapkan EMA temporal smoothing — implementasi identik dengan BlazePoseDetector.
+     *
+     * Keypoint dengan score < 0.3 × MIN_KEYPOINT_SCORE threshold dikembalikan dengan score=0
+     * agar renderer tidak menampilkannya, sambil mempertahankan posisi buffer EMA dari frame
+     * sebelumnya (tidak terkontaminasi noise).
+     */
+    private fun applyTemporalSmoothing(
+        rawKeypoints: List<Keypoint>,
+        currentRawValues: FloatArray
+    ): List<Keypoint> {
+        val prevKps = previousKeypoints
+        if (prevKps == null) {
+            previousKeypoints = currentRawValues.copyOf()
+            return rawKeypoints
+        }
+
+        val smoothedKeypoints = mutableListOf<Keypoint>()
+        val smoothedValues = FloatArray(currentRawValues.size)
+
+        for (i in rawKeypoints.indices) {
+            val idx = i * 2
+            if (idx + 1 >= currentRawValues.size || idx + 1 >= prevKps.size) {
+                smoothedKeypoints.add(rawKeypoints[i])
+                continue
+            }
+
+            val kp = rawKeypoints[i]
+            if (kp.score < MIN_KEYPOINT_SCORE * 0.6f) {
+                // Keypoint tidak terlihat dengan baik — pertahankan posisi buffer sebelumnya
+                // tapi kembalikan score=0 agar tidak dirender di posisi yang salah.
+                smoothedValues[idx]     = prevKps[idx]
+                smoothedValues[idx + 1] = prevKps[idx + 1]
+                smoothedKeypoints.add(kp.copy(x = prevKps[idx], y = prevKps[idx + 1], score = 0f))
+            } else {
+                // EMA normal
+                val sx = EMA_ALPHA * currentRawValues[idx]     + (1 - EMA_ALPHA) * prevKps[idx]
+                val sy = EMA_ALPHA * currentRawValues[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
+                smoothedValues[idx]     = sx
+                smoothedValues[idx + 1] = sy
+                smoothedKeypoints.add(kp.copy(x = sx, y = sy))
+            }
+        }
+
+        previousKeypoints = smoothedValues
+        return smoothedKeypoints
+    }
+
+    private fun resetTemporalSmoothing() {
+        previousKeypoints = null
     }
 
     override fun getInputSize(): Pair<Int, Int> = Pair(INPUT_SIZE, INPUT_SIZE)
@@ -93,6 +226,9 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
     override fun isClosed(): Boolean = synchronized(lock) { isClosed }
 
     override fun close() {
-        synchronized(lock) { isClosed = true }
+        synchronized(lock) {
+            isClosed = true
+            previousKeypoints = null
+        }
     }
 }
