@@ -7,7 +7,6 @@ import com.application.skripsiarvan.domain.model.BodyPart
 import com.application.skripsiarvan.domain.model.Keypoint
 import com.application.skripsiarvan.domain.model.Person
 import org.tensorflow.lite.Interpreter
-import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
 import org.tensorflow.lite.support.image.ops.ResizeOp
@@ -61,18 +60,13 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
     }
 
     private val imageProcessor by lazy {
-        val builder =
-                ImageProcessor.Builder()
-                        .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
-
-        // MoveNet tersedia dalam varian INT8 dan FLOAT32.
-        // INT8: tidak perlu normalisasi (nilai sudah dalam rentang byte).
-        // FLOAT32: normalisasi ke [0, 1] dengan membagi 255.
-        if (interpreter.getInputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
-            builder.add(NormalizeOp(0f, 255f))
-        }
-
-        builder.build()
+        // MoveNet Lightning FP16: input FLOAT32, nilai piksel [0, 255] — tidak perlu normalisasi.
+        // "FP16" hanya mengacu pada bobot model (weight quantization), bukan format I/O.
+        // NormalizeOp(0f, 255f) yang membagi /255 → [0,1] adalah SALAH untuk model ini.
+        // Untuk INT8 MoveNet (UINT8 input): TFLite menangani konversi byte secara otomatis.
+        ImageProcessor.Builder()
+                .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
+                .build()
     }
 
     private val lock = Any()
@@ -97,7 +91,7 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
      * Validasi bahwa model yang dimuat sesuai spesifikasi MoveNet Lightning SinglePose.
      *
      * Spesifikasi yang diharapkan:
-     *   Input  : [1, 192, 192, 3] UINT8 (INT8) atau FLOAT32
+     *   Input  : [1, 192, 192, 3] FLOAT32, nilai piksel raw [0, 255] (tanpa normalisasi)
      *   Output : [1, 1, 17, 3] FLOAT32 — singlepose, 17 COCO keypoints, [y, x, score]
      *
      * Multipose MoveNet outputnya berbeda: [1, 6, 56] — BUKAN yang kita pakai.
@@ -109,20 +103,25 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
 
         val sep = "─".repeat(60)
         Log.i(TAG, sep)
-        Log.i(TAG, "  VALIDASI MODEL: MoveNet Lightning SinglePose INT8")
+        Log.i(TAG, "  VALIDASI MODEL: MoveNet Lightning SinglePose FP16")
         Log.i(TAG, sep)
 
         // ── Input tensor ─────────────────────────────────────────────────────
         try {
             val inputShape = interpreter.getInputTensor(0).shape()
             val inputType  = interpreter.getInputTensor(0).dataType()
-            val inputOk    = inputShape.contentEquals(intArrayOf(1, INPUT_SIZE, INPUT_SIZE, 3))
+            val inputOk      = inputShape.contentEquals(intArrayOf(1, INPUT_SIZE, INPUT_SIZE, 3))
+            val inputIsFloat = inputType == org.tensorflow.lite.DataType.FLOAT32
             Log.i(TAG, "  Input  : shape=${inputShape.contentToString()}, type=$inputType")
-            if (inputOk) {
-                Log.i(TAG, "  Input  : ✓ sesuai [1, $INPUT_SIZE, $INPUT_SIZE, 3]")
-            } else {
-                Log.w(TAG, "  Input  : ⚠️ TIDAK SESUAI — expected [1, $INPUT_SIZE, $INPUT_SIZE, 3]. " +
-                    "Apakah ini benar-benar MoveNet Lightning 192×192?")
+            when {
+                inputOk && inputIsFloat ->
+                    Log.i(TAG, "  Input  : ✓ sesuai [1, $INPUT_SIZE, $INPUT_SIZE, 3] FLOAT32 (FP16 model)")
+                inputOk && !inputIsFloat ->
+                    Log.w(TAG, "  Input  : ⚠️ shape OK tapi type=$inputType — " +
+                        "mungkin INT8 bukan FP16. Periksa file model.")
+                else ->
+                    Log.w(TAG, "  Input  : ⚠️ TIDAK SESUAI — expected [1, $INPUT_SIZE, $INPUT_SIZE, 3]. " +
+                        "Apakah ini benar-benar MoveNet Lightning 192×192?")
             }
         } catch (e: Exception) {
             Log.e(TAG, "  Input  : ⛔ Gagal baca tensor input: ${e.message}")

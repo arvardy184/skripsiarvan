@@ -5,8 +5,8 @@ package com.application.skripsiarvan.domain.model
  */
 enum class ModelType(val displayName: String, val fileName: String) {
     MOVENET_LIGHTNING(
-        displayName = "MoveNet Lightning (INT8)",
-        fileName = "movenet_lightning_int8.tflite"  // singlepose, 192×192, INT8 quantized
+        displayName = "MoveNet Lightning (FP16)",
+        fileName = "movenet_lightning_fp16.tflite"  // singlepose, 192×192, FP16 weights
     ),
     BLAZEPOSE_LITE(
         displayName = "MediaPipe BlazePose Lite (FP16)",
