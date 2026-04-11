@@ -42,11 +42,15 @@ class SquatDetector : ExerciseDetector {
         private const val ANGLE_STAND_EXIT =
                 145.0
 
-        private const val ANGLE_SQUAT_ENTER = 110.0 // Parallel Squat (lebih toleran dari 100°)
-        private const val ANGLE_SQUAT_EXIT = 120.0 // Toleransi mulai naik
+        // Squat depth threshold — dilonggarkan ke 120° agar kompatibel dengan FPS rendah (<15fps).
+        // Pada 10fps, window=7 menghasilkan ~5° lag → smoothed tidak pernah sentuh 110°.
+        // 120° ≈ "quarter squat" — cukup untuk mendeteksi gerakan full ROM.
+        private const val ANGLE_SQUAT_ENTER = 120.0
+        private const val ANGLE_SQUAT_EXIT = 130.0 // Hysteresis tetap 10° dari ENTER
 
-        // Smoothing configuration (larger window = more stable with noisy models)
-        private const val SMOOTHING_WINDOW_SIZE = 7
+        // Window=3: lag hanya ~100ms di 10fps (vs 300ms dengan window=7).
+        // Cukup meredam spike 1-2 frame tanpa menelan threshold.
+        private const val SMOOTHING_WINDOW_SIZE = 3
 
         // Temporal constraints (ms)
         private const val MIN_SQUAT_HOLD_DESC = "0.3 det"

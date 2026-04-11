@@ -5,7 +5,7 @@ package com.application.skripsiarvan.domain.model
  */
 enum class ModelType(val displayName: String, val fileName: String) {
     MOVENET_LIGHTNING(
-        displayName = "MoveNet Lightning (INT8)",
+        displayName = "MoveNet Lightning (FP16)",
         fileName = "movenet.tflite"
     ),
     BLAZEPOSE_LITE(

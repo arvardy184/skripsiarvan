@@ -35,7 +35,8 @@ class PoseImageAnalyzer(
         private val onResults:
                 (
                         person: Person?,
-                        inferenceTime: Long,
+                        processingTimeMs: Long,   // end-to-end: preprocessing + model inference
+                        modelInferenceTimeMs: Long, // hanya TFLite detectPose() — untuk skripsi
                         fps: Float,
                         cpuUsage: Float,
                         memoryUsage: Float,
@@ -55,6 +56,7 @@ class PoseImageAnalyzer(
     private var frameCount = 0
     private var lastFpsTimestamp = System.currentTimeMillis()
     private var currentFps = 0f
+    private var lastFrameTimestamp = 0L  // untuk instantaneous FPS di detik pertama
 
     // Warm-up tracking
     private var totalFrameCount = 0
@@ -94,24 +96,31 @@ class PoseImageAnalyzer(
                 return
             }
 
-            // Run inference
+            // Ukur hanya TFLite inference — ini yang diklaim sebagai "latensi model" di skripsi
+            val modelStartTime = System.nanoTime()
             val person = poseDetector.detectPose(resizedBitmap)
+            val modelInferenceTimeMs = (System.nanoTime() - modelStartTime) / 1_000_000L
 
             // Correct keypoint coordinates from letterbox space back to original image space
             val correctedPerson = person?.let { correctLetterboxCoordinates(it, letterboxResult) }
 
-            // Hitung latensi inferensi dalam milidetik
-            val inferenceTime = (System.nanoTime() - startTime) / 1_000_000L
+            // End-to-end processing time (termasuk YUV decode, rotate, letterbox, model)
+            val processingTimeMs = (System.nanoTime() - startTime) / 1_000_000L
 
-            // Calculate FPS
+            // FPS: gunakan rolling 1-detik; fallback instantaneous untuk detik pertama
             frameCount++
             val currentTime = System.currentTimeMillis()
+            val frameDeltaMs = if (lastFrameTimestamp > 0) currentTime - lastFrameTimestamp else 0L
+            lastFrameTimestamp = currentTime
             val elapsedTime = currentTime - lastFpsTimestamp
 
-            if (elapsedTime >= 1000) { // Update FPS every second
+            if (elapsedTime >= 1000) {
                 currentFps = (frameCount * 1000f) / elapsedTime
                 frameCount = 0
                 lastFpsTimestamp = currentTime
+            } else if (currentFps == 0f && frameDeltaMs > 0) {
+                // Belum ada rolling FPS — pakai instantaneous agar detik pertama tidak report 0
+                currentFps = 1000f / frameDeltaMs
             }
 
             // Resource profiling dengan interval (Bagian 4.5.2)
@@ -126,7 +135,8 @@ class PoseImageAnalyzer(
             // Send results back to UI
             onResults(
                     correctedPerson,
-                    if (isWarmUpFrame) 0 else inferenceTime,
+                    if (isWarmUpFrame) 0L else processingTimeMs,
+                    if (isWarmUpFrame) 0L else modelInferenceTimeMs,
                     if (isWarmUpFrame) 0f else currentFps,
                     lastCpuUsage,
                     lastMemoryUsage,
@@ -134,17 +144,21 @@ class PoseImageAnalyzer(
                     isWarmUpFrame
             )
 
+            // Geometric sanity check setiap 60 frame (hanya saat ada orang)
+            if (correctedPerson != null && totalFrameCount % 60 == 0) {
+                logSanityCheck(correctedPerson)
+            }
+
             // Throttled logging (setiap 30 frame)
             if (totalFrameCount % 30 == 0) {
                 Log.d(
                         TAG,
-                        "Processing: FPS=%.1f, Latency=%dms, WarmUp=%b, Scale=%.2f, Pad=%.0f,%.0f".format(
+                        "FPS=%.1f model=%dms total=%dms WarmUp=%b Scale=%.2f".format(
                                 currentFps,
-                                inferenceTime,
+                                modelInferenceTimeMs,
+                                processingTimeMs,
                                 isWarmUpFrame,
-                                letterboxResult.scale,
-                                letterboxResult.padX,
-                                letterboxResult.padY
+                                letterboxResult.scale
                         )
                 )
             }
@@ -242,6 +256,49 @@ class PoseImageAnalyzer(
                 }
 
         return Person(keypoints = correctedKeypoints, score = person.score)
+    }
+
+    /**
+     * Validasi geometri pose — memastikan keypoint mapping sudah benar.
+     *
+     * Aturan yang diperiksa (semua berbasis koordinat normalized [0,1], y=0 atas):
+     * 1. Nose (y) < Shoulder (y)        — hidung di atas bahu
+     * 2. Shoulder (y) < Hip (y)         — bahu di atas pinggul
+     * 3. Hip (y) < Knee (y)             — pinggul di atas lutut
+     * 4. Knee (y) < Ankle (y)           — lutut di atas pergelangan kaki
+     * 5. L.Shoulder.x > R.Shoulder.x    — di kamera mirror, kiri secara visual ada di kanan pixel
+     *
+     * Jika ada aturan yang dilanggar secara konsisten → kemungkinan ada swap x/y atau
+     * mapping COCO index yang salah.
+     *
+     * Hanya di-log setiap 60 frame agar tidak spam.
+     */
+    private fun logSanityCheck(person: Person) {
+        val kp = person.keypoints
+        if (kp.size < 17) return
+
+        val minScore = 0.5f
+        val violations = mutableListOf<String>()
+
+        fun check(conditionName: String, a: Int, b: Int, aLabel: String, bLabel: String, checkY: Boolean) {
+            val ka = kp[a]; val kb = kp[b]
+            if (ka.score < minScore || kb.score < minScore) return
+            val aVal = if (checkY) ka.y else ka.x
+            val bVal = if (checkY) kb.y else kb.x
+            if (aVal >= bVal) violations.add("$conditionName: $aLabel(${"%4.2f".format(aVal)}) should be < $bLabel(${"%4.2f".format(bVal)})")
+        }
+
+        // Y-axis checks (y=0 adalah atas layar)
+        check("nose<shoulder", 0, 5, "nose.y", "L.sh.y", checkY = true)
+        check("shoulder<hip", 5, 11, "L.sh.y", "L.hip.y", checkY = true)
+        check("hip<knee", 11, 13, "L.hip.y", "L.kn.y", checkY = true)
+        check("knee<ankle", 13, 15, "L.kn.y", "L.ank.y", checkY = true)
+
+        if (violations.isEmpty()) {
+            Log.d(TAG, "✅ Sanity OK: frame=$totalFrameCount, score=${"%.2f".format(person.score)}")
+        } else {
+            Log.w(TAG, "⚠️ Sanity FAIL (frame=$totalFrameCount): ${violations.joinToString(" | ")}")
+        }
     }
 
     /** Reset frame counter untuk warm-up baru */

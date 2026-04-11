@@ -40,25 +40,37 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         private const val INPUT_SIZE = 256
         private const val NUM_KEYPOINTS = 17
         private const val BLAZEPOSE_KEYPOINTS = 33
-        private const val CONFIDENCE_THRESHOLD = 0.5f
+        // Threshold sama dengan MoveNet (0.3f) agar perbandingan fair.
+        // Anti-ghost tetap terjaga via global presence gate (tensor ke-1) yang merupakan
+        // metadata native model BlazePose — bukan filter artifisial.
+        private const val CONFIDENCE_THRESHOLD = 0.3f
 
         // Minimal skor presence per-keypoint agar dianggap benar-benar ada di frame.
         // sigmoid(0) = 0.5, jadi threshold ini menyaring output noise saat tidak ada orang.
         private const val PRESENCE_THRESHOLD = 0.5f
 
-        // Warm-up frames — sesuai pseudocode di Bab 4.5.1 skripsi:
-        // "IF frameCount < 5 THEN PerformWarmUp()" untuk menghindari outlier inisialisasi cache
-        private const val WARMUP_FRAMES = 5
+        // Warm-up ditangani sepenuhnya oleh PoseImageAnalyzer (WARM_UP_FRAMES = 5) untuk
+        // KEDUA model secara simetris. BlazePose tidak punya internal warm-up sendiri agar
+        // behavior identik dengan MoveNet — penting untuk fairness perbandingan di skripsi.
 
-        // Alpha EMA temporal smoothing.
-        // Lebih kecil = lebih halus tapi ada lag; lebih besar = lebih responsif tapi lebih noise.
-        private const val EMA_ALPHA = 0.4f
+        // Alpha EMA temporal smoothing — IDENTIK dengan MoveNet (0.2f) untuk perbandingan fair.
+        // Nilai ini dikontrol sama di kedua model (Bab 3 Metodologi: post-processing pipeline identik).
+        private const val EMA_ALPHA = 0.2f
+
+        // Deadband: pergerakan < nilai ini (normalized [0,1]) diabaikan — tidak update posisi.
+        // 0.008 ≈ <1% lebar layar: menekan micro-jitter yang tidak berarti secara visual.
+        private const val EMA_DEADBAND = 0.008f
+
+        // Keypoint dengan score di bawah ini dianggap "tidak terdeteksi dengan baik".
+        private const val EMA_LOW_CONF_THRESHOLD = 0.4f
 
         // Pemetaan indeks COCO 17 → indeks BlazePose 33
+        // Referensi urutan BlazePose: 0=nose, 1=left_eye_inner, 2=left_eye, 3=left_eye_outer,
+        //   4=right_eye_inner, 5=right_eye, 6=right_eye_outer, 7=left_ear, 8=right_ear, ...
         private val COCO_TO_BLAZEPOSE = mapOf(
             0  to 0,  // nose
-            1  to 2,  // left_eye  ← left_eye_inner
-            2  to 5,  // right_eye ← right_eye_inner
+            1  to 2,  // left_eye  ← BlazePose index 2 (left_eye, bukan inner)
+            2  to 5,  // right_eye ← BlazePose index 5 (right_eye, bukan inner)
             3  to 7,  // left_ear
             4  to 8,  // right_ear
             5  to 11, // left_shoulder
@@ -110,6 +122,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     private var globalPresenceBuffer: java.nio.ByteBuffer? = null
     private var hasGlobalPresenceTensor = false
     private var globalPresenceChecked = false
+    private var firstDetectionLogged = false
 
     /**
      * Inisialisasi buffer output sekali berdasarkan shape tensor output model.
@@ -118,12 +131,22 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     private fun ensureBuffersInitialized() {
         if (cachedOutputBuffer != null) return
 
+        val numOutputs = interpreter.outputTensorCount
+        val inputShape  = interpreter.getInputTensor(0).shape()
+        val inputType   = interpreter.getInputTensor(0).dataType()
         val outputShape = interpreter.getOutputTensor(0).shape()
-        val totalSize = outputShape.reduce { acc, i -> acc * i }
-        val stride = totalSize / BLAZEPOSE_KEYPOINTS
+        val totalSize   = outputShape.reduce { acc, i -> acc * i }
+        val stride      = totalSize / BLAZEPOSE_KEYPOINTS
+
+        // ── Satu kali log saat init — cukup untuk verifikasi model di Logcat ────────────────────
+        Log.d(TAG, "── BlazePose Init ──────────────────────────────")
+        Log.d(TAG, "  in : ${inputShape.contentToString()} $inputType")
+        Log.d(TAG, "  out[0]: ${outputShape.contentToString()} → totalSize=$totalSize, stride=$stride")
+        Log.d(TAG, "  numOutputs=$numOutputs | ema=$EMA_ALPHA | thr=$CONFIDENCE_THRESHOLD (warmup handled by PoseImageAnalyzer)")
+        Log.d(TAG, "────────────────────────────────────────────────")
 
         if (stride < 3) {
-            Log.e(TAG, "Output tensor tidak valid: totalSize=$totalSize, stride=$stride (min 3)")
+            Log.e(TAG, "Output tensor tidak valid: stride=$stride (min 3) — model salah?")
             return
         }
 
@@ -134,28 +157,23 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
             it.order(java.nio.ByteOrder.nativeOrder())
         }
 
-        // Cek apakah model memiliki output tensor ke-1 (global pose presence)
         if (!globalPresenceChecked) {
             globalPresenceChecked = true
             try {
-                val numOutputs = interpreter.outputTensorCount
                 if (numOutputs > 1) {
                     val presenceShape = interpreter.getOutputTensor(1).shape()
-                    val presenceSize = presenceShape.reduce { acc, i -> acc * i }
+                    val presenceSize  = presenceShape.reduce { acc, i -> acc * i }
                     globalPresenceBuffer = java.nio.ByteBuffer.allocateDirect(presenceSize * 4)
                         .also { it.order(java.nio.ByteOrder.nativeOrder()) }
                     hasGlobalPresenceTensor = true
-                    Log.d(TAG, "Global presence tensor ditemukan: shape=${presenceShape.contentToString()}")
+                    Log.d(TAG, "  out[1]: ${presenceShape.contentToString()} → global presence tensor ✓")
                 } else {
-                    Log.d(TAG, "Model tidak memiliki global presence tensor — filter per-keypoint saja")
+                    Log.d(TAG, "  out[1]: tidak ada → filter per-keypoint saja")
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Gagal cek global presence tensor: ${e.message}")
             }
         }
-
-        Log.d(TAG, "Buffer output diinisialisasi: totalSize=$totalSize, stride=$stride " +
-                "(${BLAZEPOSE_KEYPOINTS} keypoints × $stride values)")
     }
 
     override fun detectPose(bitmap: Bitmap): Person? {
@@ -266,30 +284,21 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                 // Terapkan EMA temporal smoothing
                 val smoothedKeypoints = applyTemporalSmoothing(keypoints, currentRawKeypoints)
 
-                // Debug logging — sparse: 5 frame pertama (warm-up) + setiap 200 frame
-                if (frameCount <= WARMUP_FRAMES || frameCount % 200 == 0) {
-                    val nose = smoothedKeypoints.firstOrNull()
-                    Log.d(TAG,
-                        "Frame $frameCount [${bitmap.width}×${bitmap.height}]: " +
-                        "nose=(${nose?.x?.let { "%.3f".format(it) }}, " +
-                               "${nose?.y?.let { "%.3f".format(it) }}), " +
-                        "vis=${"%.3f".format(nose?.score ?: 0f)}, " +
-                        "avg=${"%.3f".format(avgScore)}, " +
-                        "divisor=$coordsDivisor, stride=$valuesPerKeypoint"
-                    )
-                }
-
-                // Warm-up: 5 frame awal tidak digunakan untuk deteksi
-                // (sesuai Bab 4.5.1 — menghindari outlier akibat inisialisasi cache GPU)
-                if (frameCount <= WARMUP_FRAMES) return null
-
                 return if (avgScore >= CONFIDENCE_THRESHOLD) {
+                    if (!firstDetectionLogged) {
+                        firstDetectionLogged = true
+                        val nose      = smoothedKeypoints[0]
+                        val lShoulder = smoothedKeypoints[5]
+                        val rShoulder = smoothedKeypoints[6]
+                        val lHip      = smoothedKeypoints[11]
+                        Log.d(TAG, "✓ First detection: avg=${"%.3f".format(avgScore)} | divisor=$coordsDivisor | stride=$valuesPerKeypoint")
+                        Log.d(TAG, "  nose      (${"%5.3f".format(nose.x)}, ${"%5.3f".format(nose.y)}) s=${"%4.2f".format(nose.score)}")
+                        Log.d(TAG, "  L.shoulder(${"%5.3f".format(lShoulder.x)}, ${"%5.3f".format(lShoulder.y)}) s=${"%4.2f".format(lShoulder.score)}")
+                        Log.d(TAG, "  R.shoulder(${"%5.3f".format(rShoulder.x)}, ${"%5.3f".format(rShoulder.y)}) s=${"%4.2f".format(rShoulder.score)}")
+                        Log.d(TAG, "  L.hip     (${"%5.3f".format(lHip.x)}, ${"%5.3f".format(lHip.y)}) s=${"%4.2f".format(lHip.score)}")
+                    }
                     Person(keypoints = smoothedKeypoints, score = avgScore)
                 } else {
-                    if (frameCount % 60 == 0) {
-                        Log.v(TAG, "Confidence pose terlalu rendah: ${"%.4f".format(avgScore)}")
-                    }
-                    // Reset EMA agar posisi lama tidak "hantu" ke frame berikutnya
                     resetTemporalSmoothing()
                     null
                 }
@@ -387,19 +396,28 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
             }
 
             val kp = rawKeypoints[i]
-            if (kp.score < 0.2f) {
-                // Keypoint tidak terdeteksi dengan baik.
-                // Gunakan posisi CURRENT (bukan lama) — posisi noise lebih jujur daripada
-                // ghost dari orang yang sudah tidak ada di frame.
-                val sx = currentRawValues[idx]
-                val sy = currentRawValues[idx + 1]
+            if (kp.score < EMA_LOW_CONF_THRESHOLD) {
+                // Keypoint confidence rendah → pakai posisi PREVIOUS yang stabil.
+                // Menghindari jitter dari output model yang noisy untuk keypoint yang
+                // setengah terlihat. Ghost tidak jadi masalah karena global presence gate
+                // akan reset semua EMA saat orang benar-benar pergi dari frame.
+                val sx = prevKps[idx]
+                val sy = prevKps[idx + 1]
                 smoothedValues[idx]     = sx
                 smoothedValues[idx + 1] = sy
                 smoothedKeypoints.add(kp.copy(x = sx, y = sy))
             } else {
-                // EMA normal
-                val sx = EMA_ALPHA * currentRawValues[idx]     + (1 - EMA_ALPHA) * prevKps[idx]
-                val sy = EMA_ALPHA * currentRawValues[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
+                // EMA normal untuk keypoint yang terdeteksi dengan baik
+                val candidateX = EMA_ALPHA * currentRawValues[idx]     + (1 - EMA_ALPHA) * prevKps[idx]
+                val candidateY = EMA_ALPHA * currentRawValues[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
+
+                // Deadband: jika pergerakan dari posisi sebelumnya sangat kecil (<0.8% layar),
+                // pertahankan posisi lama — menghilangkan micro-jitter saat orang diam.
+                val dx = kotlin.math.abs(candidateX - prevKps[idx])
+                val dy = kotlin.math.abs(candidateY - prevKps[idx + 1])
+                val sx = if (dx > EMA_DEADBAND) candidateX else prevKps[idx]
+                val sy = if (dy > EMA_DEADBAND) candidateY else prevKps[idx + 1]
+
                 smoothedValues[idx]     = sx
                 smoothedValues[idx + 1] = sy
                 smoothedKeypoints.add(kp.copy(x = sx, y = sy))

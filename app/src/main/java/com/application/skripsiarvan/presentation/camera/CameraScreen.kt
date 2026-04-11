@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -53,6 +55,9 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
 
         var previewView by remember { mutableStateOf<PreviewView?>(null) }
         val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+
+        // Menampilkan nama + skor tiap keypoint langsung di overlay
+        var debugMode by remember { mutableStateOf(false) }
 
         // Show toast for export results
         LaunchedEffect(uiState.lastExportPath) {
@@ -92,7 +97,8 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                                                 resourceProfiler = viewModel.getResourceProfiler()
                                         ) {
                                                 person,
-                                                inferenceTime,
+                                                processingTime,
+                                                modelInferenceTime,
                                                 fps,
                                                 cpuUsage,
                                                 memoryUsage,
@@ -100,7 +106,8 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                                                 isWarmUpFrame ->
                                                 viewModel.updateResults(
                                                         person,
-                                                        inferenceTime,
+                                                        processingTime,
+                                                        modelInferenceTime,
                                                         fps,
                                                         cpuUsage,
                                                         memoryUsage,
@@ -125,10 +132,28 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                 }
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    // Double-tap untuk toggle debug mode
+                    detectTapGestures(
+                        onDoubleTap = {
+                            debugMode = !debugMode
+                        }
+                    )
+                }
+        ) {
                 // Camera Preview
                 AndroidView(
-                        factory = { ctx -> PreviewView(ctx).also { previewView = it } },
+                        factory = { ctx ->
+                            PreviewView(ctx).also {
+                                // FIT_CENTER: preview di-letterbox (ada hitam di tepi) tapi
+                                // koordinat keypoint akurat 100% karena tidak ada cropping.
+                                // FILL_CENTER (default) crop frame → overlay meleset dari orang.
+                                it.scaleType = PreviewView.ScaleType.FIT_CENTER
+                                previewView = it
+                            }
+                        },
                         modifier = Modifier.fillMaxSize()
                 )
 
@@ -137,8 +162,24 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                         person = uiState.detectedPerson,
                         viewWidth = previewView?.width?.toFloat() ?: 1080f,
                         viewHeight = previewView?.height?.toFloat() ?: 1920f,
-                        formFeedback = uiState.formFeedback
+                        formFeedback = uiState.formFeedback,
+                        debugMode = debugMode
                 )
+
+                // Debug mode badge
+                if (debugMode) {
+                    Text(
+                        text = "DEBUG ON",
+                        color = Color.Yellow,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 8.dp, end = 8.dp)
+                            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
 
                 // Warm-up indicator
                 if (!uiState.isWarmUpComplete) {

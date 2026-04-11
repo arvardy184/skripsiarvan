@@ -39,11 +39,14 @@ class PushUpDetector : ExerciseDetector {
         private const val ANGLE_UP_ENTER = 155.0 // Lengan lurus (tidak harus lockout sempurna)
         private const val ANGLE_UP_EXIT = 140.0 // Mulai menekuk (lowered for sensitivity)
 
-        private const val ANGLE_DOWN_ENTER = 100.0 // Siku mendekati 90° (lebih toleran)
-        private const val ANGLE_DOWN_EXIT = 110.0 // Mulai mendorong naik
+        // Push-up bottom threshold — dilonggarkan ke 110° agar kompatibel dengan FPS rendah (<15fps).
+        // Pada 10fps, window=7 menghasilkan ~8° lag → smoothed tidak pernah sentuh 100°.
+        // 110° ≈ siku masih menekuk cukup dalam untuk ROM yang valid.
+        private const val ANGLE_DOWN_ENTER = 110.0
+        private const val ANGLE_DOWN_EXIT = 120.0 // Hysteresis tetap 10° dari ENTER
 
-        // Smoothing configuration (larger window for noisy models)
-        private const val SMOOTHING_WINDOW_SIZE = 7
+        // Window=3: lag hanya ~100ms di 10fps (vs 300ms dengan window=7).
+        private const val SMOOTHING_WINDOW_SIZE = 3
 
         // Temporal constraints (ms)
         private const val MIN_DOWN_HOLD_MS = 150L // Turunkan sedikit agar lebih responsive

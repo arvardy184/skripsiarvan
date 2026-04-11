@@ -23,15 +23,30 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
         private const val INPUT_SIZE = 192
         private const val NUM_KEYPOINTS = 17
         private const val CONFIDENCE_THRESHOLD = 0.3f
+
+        // EMA smoothing — IDENTIK dengan BlazePose (0.2f) untuk perbandingan fair.
+        // Post-processing pipeline dikontrol sama di kedua model (Bab 3 Metodologi).
+        private const val EMA_ALPHA = 0.2f
+
+        // Deadband — IDENTIK dengan BlazePose (0.008f).
+        private const val EMA_DEADBAND = 0.008f
+
+        // Threshold confidence rendah — IDENTIK dengan BlazePose (0.4f).
+        // Keypoint dengan score < nilai ini dibekukan ke posisi sebelumnya (tidak di-EMA).
+        private const val EMA_LOW_CONF_THRESHOLD = 0.4f
     }
 
     private val imageProcessor by lazy {
-        val builder =
-                ImageProcessor.Builder()
-                        .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
+        val inputType = interpreter.getInputTensor(0).dataType()
+        val inputShape = interpreter.getInputTensor(0).shape()
+        val outputShape = interpreter.getOutputTensor(0).shape()
 
-        // Cek apakah model membutuhkan Float atau Byte
-        if (interpreter.getInputTensor(0).dataType() == org.tensorflow.lite.DataType.FLOAT32) {
+        Log.d(TAG, "Init: in=${inputShape.contentToString()} $inputType | out=${outputShape.contentToString()}")
+
+        val builder = ImageProcessor.Builder()
+            .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
+
+        if (inputType == org.tensorflow.lite.DataType.FLOAT32) {
             builder.add(NormalizeOp(0f, 255f))
         }
 
@@ -40,29 +55,29 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
 
     private val lock = Any()
     private var isClosed = false
+    private var firstDetectionLogged = false
+
+    // Buffer EMA: menyimpan koordinat [x0,y0, x1,y1, ..., x16,y16] dari frame sebelumnya
+    private var previousKeypoints: FloatArray? = null
 
     override fun detectPose(bitmap: Bitmap): Person? {
         synchronized(lock) {
             if (isClosed) return null
 
             try {
-                // Preprocess image
                 var tensorImage = TensorImage.fromBitmap(bitmap)
                 tensorImage = imageProcessor.process(tensorImage)
 
-                // Prepare output buffer: [1, 1, 17, 3]
                 val output = Array(1) { Array(1) { Array(NUM_KEYPOINTS) { FloatArray(3) } } }
 
-                // Run inference
                 interpreter.run(tensorImage.buffer, output)
 
-                // Parse output
                 val keypoints = mutableListOf<Keypoint>()
                 var totalScore = 0f
 
                 for (i in 0 until NUM_KEYPOINTS) {
-                    val y = output[0][0][i][0] // Normalized y [0-1]
-                    val x = output[0][0][i][1] // Normalized x [0-1]
+                    val y = output[0][0][i][0]
+                    val x = output[0][0][i][1]
                     val score = output[0][0][i][2]
 
                     keypoints.add(Keypoint(x = x, y = y, score = score, label = BodyPart.labels[i]))
@@ -71,10 +86,50 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
 
                 val avgScore = totalScore / NUM_KEYPOINTS
 
-                // Only return if average confidence is above threshold
-                return if (avgScore >= CONFIDENCE_THRESHOLD) {
-                    Person(keypoints = keypoints, score = avgScore)
+                // Terapkan EMA smoothing
+                val currentRaw = FloatArray(NUM_KEYPOINTS * 2) { i ->
+                    val kpIdx = i / 2
+                    if (i % 2 == 0) keypoints[kpIdx].x else keypoints[kpIdx].y
+                }
+                val prevKps = previousKeypoints
+                val smoothedKeypoints = if (prevKps == null) {
+                    keypoints
                 } else {
+                    keypoints.mapIndexed { i, kp ->
+                        val idx = i * 2
+                        if (kp.score < EMA_LOW_CONF_THRESHOLD) {
+                            // Confidence rendah → bekukan ke posisi sebelumnya (identik dengan BlazePose)
+                            kp.copy(x = prevKps[idx], y = prevKps[idx + 1])
+                        } else {
+                            val candidateX = EMA_ALPHA * currentRaw[idx]     + (1 - EMA_ALPHA) * prevKps[idx]
+                            val candidateY = EMA_ALPHA * currentRaw[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
+                            val dx = kotlin.math.abs(candidateX - prevKps[idx])
+                            val dy = kotlin.math.abs(candidateY - prevKps[idx + 1])
+                            val sx = if (dx > EMA_DEADBAND) candidateX else prevKps[idx]
+                            val sy = if (dy > EMA_DEADBAND) candidateY else prevKps[idx + 1]
+                            kp.copy(x = sx, y = sy)
+                        }
+                    }
+                }
+
+                return if (avgScore >= CONFIDENCE_THRESHOLD) {
+                    previousKeypoints = FloatArray(NUM_KEYPOINTS * 2) { i ->
+                        val kpIdx = i / 2
+                        if (i % 2 == 0) smoothedKeypoints[kpIdx].x else smoothedKeypoints[kpIdx].y
+                    }
+                    if (!firstDetectionLogged) {
+                        firstDetectionLogged = true
+                        val nose = smoothedKeypoints[0]
+                        val lShoulder = smoothedKeypoints[5]
+                        val rShoulder = smoothedKeypoints[6]
+                        Log.d(TAG, "✓ First detection: avg=${"%.3f".format(avgScore)} | " +
+                            "nose=(${"%5.3f".format(nose.x)}, ${"%5.3f".format(nose.y)}) s=${"%4.2f".format(nose.score)} | " +
+                            "L.shoulder=(${"%5.3f".format(lShoulder.x)}, ${"%5.3f".format(lShoulder.y)}) | " +
+                            "R.shoulder=(${"%5.3f".format(rShoulder.x)}, ${"%5.3f".format(rShoulder.y)})")
+                    }
+                    Person(keypoints = smoothedKeypoints, score = avgScore)
+                } else {
+                    previousKeypoints = null  // reset EMA saat orang tidak terdeteksi
                     null
                 }
             } catch (e: Exception) {

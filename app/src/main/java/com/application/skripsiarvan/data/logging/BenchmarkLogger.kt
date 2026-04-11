@@ -15,13 +15,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.sqrt
 
 /**
- * Class untuk logging dan export data benchmark
- * Sesuai dengan Tabel 4.1 Kebutuhan Fungsional - Pencatatan Data Otomatis
- * 
- * "Sistem harus dapat menyimpan data metrik performa (Latensi, FPS, CPU Load) 
- * ke dalam format log (CSV) untuk keperluan analisis statistik lebih lanjut."
+ * Class untuk logging dan export data benchmark.
+ * Sesuai dengan Tabel 4.1 Kebutuhan Fungsional — Pencatatan Data Otomatis.
+ *
+ * Thread-safe: diakses dari camera thread (logMetrics) dan UI thread (start/stop/export).
+ * - isLogging   → AtomicBoolean (volatile read/write tanpa lock)
+ * - frameCounter → AtomicInteger (increment atomic)
+ * - startTime   → AtomicLong
+ * - endTime     → AtomicLong (dicatat saat stopLogging agar durasi tersedia di summary)
  */
 class BenchmarkLogger(private val context: Context) {
 
@@ -31,70 +38,45 @@ class BenchmarkLogger(private val context: Context) {
         private const val FILE_EXTENSION = ".csv"
     }
 
-    // Thread-safe queue untuk menyimpan metrik
     private val metricsQueue = ConcurrentLinkedQueue<BenchmarkMetrics>()
-    
-    private var isLogging = false
-    private var startTime: Long = 0
-    private var frameCounter = 0
 
-    /**
-     * Memulai sesi logging baru
-     */
+    private val isLogging = AtomicBoolean(false)
+    private val frameCounter = AtomicInteger(0)
+    private val startTime = AtomicLong(0L)
+    private val endTime = AtomicLong(0L)
+
     fun startLogging() {
         metricsQueue.clear()
-        frameCounter = 0
-        startTime = System.currentTimeMillis()
-        isLogging = true
+        frameCounter.set(0)
+        startTime.set(System.currentTimeMillis())
+        endTime.set(0L)
+        isLogging.set(true)
         Log.d(TAG, "Benchmark logging started")
     }
 
-    /**
-     * Menghentikan sesi logging
-     */
     fun stopLogging() {
-        isLogging = false
-        Log.d(TAG, "Benchmark logging stopped. Total frames: $frameCounter")
+        isLogging.set(false)
+        endTime.set(System.currentTimeMillis())
+        Log.d(TAG, "Benchmark logging stopped. Total frames: ${frameCounter.get()}")
     }
 
-    /**
-     * Menambahkan metrik ke queue jika logging aktif
-     */
     fun logMetrics(metrics: BenchmarkMetrics) {
-        if (!isLogging) return
-        
-        frameCounter++
-        val metricsWithFrame = metrics.copy(frameNumber = frameCounter)
-        metricsQueue.add(metricsWithFrame)
+        if (!isLogging.get()) return
+        val frame = frameCounter.incrementAndGet()
+        metricsQueue.add(metrics.copy(frameNumber = frame))
     }
 
-    /**
-     * Mengecek apakah sedang logging
-     */
-    fun isCurrentlyLogging(): Boolean = isLogging
+    fun isCurrentlyLogging(): Boolean = isLogging.get()
 
-    /**
-     * Mendapatkan jumlah frame yang ter-log
-     */
     fun getLoggedFrameCount(): Int = metricsQueue.size
 
-    /**
-     * Mendapatkan durasi logging dalam detik
-     */
     fun getLoggingDurationSeconds(): Long {
-        return if (isLogging) {
-            (System.currentTimeMillis() - startTime) / 1000
-        } else {
-            0
-        }
+        val start = startTime.get()
+        if (start == 0L) return 0L
+        val end = if (isLogging.get()) System.currentTimeMillis() else endTime.get()
+        return (end - start) / 1000
     }
 
-    /**
-     * Export semua data ke file CSV
-     * Menyimpan ke folder Downloads
-     * 
-     * @return Path file yang disimpan, null jika gagal
-     */
     fun exportToCsv(): String? {
         if (metricsQueue.isEmpty()) {
             Log.w(TAG, "No data to export")
@@ -106,10 +88,8 @@ class BenchmarkLogger(private val context: Context) {
 
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Android 10+ menggunakan MediaStore
                 exportWithMediaStore(fileName)
             } else {
-                // Android 9 dan sebelumnya
                 exportToDownloadsFolder(fileName)
             }
         } catch (e: Exception) {
@@ -118,17 +98,12 @@ class BenchmarkLogger(private val context: Context) {
         }
     }
 
-    /**
-     * Export menggunakan MediaStore API untuk Android 10+
-     */
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun exportWithMediaStore(fileName: String): String? {
         val contentValues = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, fileName)
             put(MediaStore.Downloads.MIME_TYPE, "text/csv")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Downloads.IS_PENDING, 1)
-            }
+            put(MediaStore.Downloads.IS_PENDING, 1)
         }
 
         val resolver = context.contentResolver
@@ -137,11 +112,8 @@ class BenchmarkLogger(private val context: Context) {
 
         resolver.openOutputStream(uri)?.use { outputStream ->
             OutputStreamWriter(outputStream).use { writer ->
-                // Write header
                 writer.write(BenchmarkMetrics.getCsvHeader())
                 writer.write("\n")
-
-                // Write all metrics
                 metricsQueue.forEach { metrics ->
                     writer.write(metrics.toCsvLine())
                     writer.write("\n")
@@ -149,31 +121,22 @@ class BenchmarkLogger(private val context: Context) {
             }
         }
 
-        // Mark as complete
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentValues.clear()
-            contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
-            resolver.update(uri, contentValues, null, null)
-        }
+        contentValues.clear()
+        contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
+        resolver.update(uri, contentValues, null, null)
 
         Log.d(TAG, "Exported ${metricsQueue.size} records to $fileName")
         return uri.toString()
     }
 
-    /**
-     * Export ke folder Downloads untuk Android 9 dan sebelumnya
-     */
     private fun exportToDownloadsFolder(fileName: String): String? {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val file = File(downloadsDir, fileName)
 
         FileOutputStream(file).use { fos ->
             OutputStreamWriter(fos).use { writer ->
-                // Write header
                 writer.write(BenchmarkMetrics.getCsvHeader())
                 writer.write("\n")
-
-                // Write all metrics
                 metricsQueue.forEach { metrics ->
                     writer.write(metrics.toCsvLine())
                     writer.write("\n")
@@ -185,46 +148,70 @@ class BenchmarkLogger(private val context: Context) {
         return file.absolutePath
     }
 
-    /**
-     * Menghapus semua data yang sudah ter-log
-     */
     fun clearLog() {
         metricsQueue.clear()
-        frameCounter = 0
+        frameCounter.set(0)
         Log.d(TAG, "Log cleared")
     }
 
     /**
-     * Mendapatkan statistik ringkasan dari data yang ter-log
+     * Hitung statistik ringkasan dari semua frame yang ter-log.
+     *
+     * Metrik yang dihitung (sesuai kebutuhan analisis statistik skripsi):
+     * - Rata-rata, minimum, maksimum, dan STANDAR DEVIASI latensi inferensi
+     * - Rata-rata FPS, CPU, memori, daya
+     * - Detection rate: % frame di mana pose berhasil terdeteksi
+     * - Durasi sesi logging
      */
     fun getSummaryStatistics(): BenchmarkSummary? {
         if (metricsQueue.isEmpty()) return null
 
         val metrics = metricsQueue.toList()
-        
+        val latencies = metrics.map { it.inferenceTimeMs.toDouble() }
+
+        val avgLatency = latencies.average()
+        val stddevLatency = if (latencies.size > 1) {
+            val variance = latencies.map { (it - avgLatency) * (it - avgLatency) }.average()
+            sqrt(variance)
+        } else 0.0
+
+        val detectedFrames = metrics.count { it.poseDetected }
+        val detectionRate = if (metrics.isNotEmpty()) detectedFrames.toFloat() / metrics.size else 0f
+
+        val start = startTime.get()
+        val end = if (endTime.get() > 0L) endTime.get() else System.currentTimeMillis()
+        val durationMs = if (start > 0L) end - start else 0L
+
         return BenchmarkSummary(
             totalFrames = metrics.size,
-            avgInferenceTimeMs = metrics.map { it.inferenceTimeMs }.average(),
+            avgInferenceTimeMs = avgLatency,
+            stddevInferenceTimeMs = stddevLatency,
+            minInferenceTimeMs = latencies.minOrNull()?.toLong() ?: 0L,
+            maxInferenceTimeMs = latencies.maxOrNull()?.toLong() ?: 0L,
             avgFps = metrics.map { it.fps.toDouble() }.average().toFloat(),
             avgCpuUsage = metrics.map { it.cpuUsagePercent.toDouble() }.average().toFloat(),
             avgMemoryUsageMb = metrics.map { it.memoryUsageMb.toDouble() }.average().toFloat(),
             avgPowerConsumptionMw = metrics.map { it.powerConsumptionMw.toDouble() }.average().toFloat(),
-            minInferenceTimeMs = metrics.minOf { it.inferenceTimeMs },
-            maxInferenceTimeMs = metrics.maxOf { it.inferenceTimeMs }
+            detectionRate = detectionRate,
+            durationMs = durationMs
         )
     }
 }
 
 /**
- * Data class untuk statistik ringkasan benchmark
+ * Statistik ringkasan satu sesi benchmark.
+ * Stddev latensi wajib ada untuk uji statistik inferensial (ANOVA/t-test) di skripsi.
  */
 data class BenchmarkSummary(
     val totalFrames: Int,
     val avgInferenceTimeMs: Double,
+    val stddevInferenceTimeMs: Double,   // Wajib untuk uji statistik skripsi
+    val minInferenceTimeMs: Long,
+    val maxInferenceTimeMs: Long,
     val avgFps: Float,
     val avgCpuUsage: Float,
     val avgMemoryUsageMb: Float,
     val avgPowerConsumptionMw: Float,
-    val minInferenceTimeMs: Long,
-    val maxInferenceTimeMs: Long
+    val detectionRate: Float,            // 0.0–1.0: % frame pose terdeteksi
+    val durationMs: Long                 // Durasi sesi logging (ms)
 )

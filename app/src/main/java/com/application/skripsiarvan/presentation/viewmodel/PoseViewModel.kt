@@ -13,8 +13,6 @@ import com.application.skripsiarvan.data.profiling.ResourceProfiler
 import com.application.skripsiarvan.domain.detector.PoseDetector
 import com.application.skripsiarvan.domain.exercise.ExerciseDetector
 import com.application.skripsiarvan.domain.exercise.FormAnalyzer
-import com.application.skripsiarvan.domain.exercise.MLExerciseClassifier
-import com.application.skripsiarvan.domain.exercise.MLFormAnalyzer
 import com.application.skripsiarvan.domain.exercise.PushUpDetector
 import com.application.skripsiarvan.domain.exercise.PushUpFormAnalyzer
 import com.application.skripsiarvan.domain.exercise.SquatDetector
@@ -180,23 +178,19 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Update exercise detector based on type */
     private fun updateExerciseDetector(type: ExerciseType) {
-        // Clean up previous ML classifier if needed
-        (exerciseDetector as? MLExerciseClassifier)?.close()
-
         exerciseDetector =
                 when (type) {
                     ExerciseType.NONE -> null
                     ExerciseType.SQUAT -> SquatDetector()
                     ExerciseType.PUSH_UP -> PushUpDetector()
-                    ExerciseType.SQUAT_ML, ExerciseType.PUSH_UP_ML ->
-                            MLExerciseClassifier(getApplication())
+
                 }
         formAnalyzer =
                 when (type) {
                     ExerciseType.NONE -> null
                     ExerciseType.SQUAT -> SquatFormAnalyzer()
                     ExerciseType.PUSH_UP -> PushUpFormAnalyzer()
-                    ExerciseType.SQUAT_ML, ExerciseType.PUSH_UP_ML -> MLFormAnalyzer()
+
                 }
     }
 
@@ -238,7 +232,8 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun updateResults(
             person: Person?,
-            inferenceTime: Long,
+            processingTime: Long,
+            modelInferenceTime: Long,
             fps: Float,
             cpuUsage: Float,
             memoryUsage: Float,
@@ -275,7 +270,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value =
                 currentState.copy(
                         detectedPerson = person,
-                        inferenceTime = inferenceTime,
+                        inferenceTime = modelInferenceTime,
                         fps = fps,
                         cpuUsage = cpuUsage,
                         memoryUsage = memoryUsage,
@@ -297,13 +292,15 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                     BenchmarkMetrics(
                             modelType = currentState.selectedModel.displayName,
                             delegateType = currentState.selectedDelegate.displayName,
-                            inferenceTimeMs = inferenceTime,
+                            inferenceTimeMs = modelInferenceTime,
+                            processingTimeMs = processingTime,
                             fps = fps,
                             cpuUsagePercent = cpuUsage,
                             memoryUsageMb = memoryUsage,
                             powerConsumptionMw = powerConsumption,
                             exerciseType = currentState.selectedExercise.name,
-                            repetitionCount = repCount
+                            repetitionCount = repCount,
+                            poseDetected = person != null
                     )
             benchmarkLogger.logMetrics(metrics)
         }
@@ -367,6 +364,5 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         currentDetector?.close()
         tfliteHelper?.close()
-        (exerciseDetector as? MLExerciseClassifier)?.close()
     }
 }

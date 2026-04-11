@@ -32,12 +32,21 @@ fun PoseVisualization(
         viewWidth: Float,
         viewHeight: Float,
         formFeedback: FormFeedback? = null,
+        debugMode: Boolean = false,
         modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier.fillMaxSize()) {
-        person?.let { drawPoseSkeleton(it, viewWidth, viewHeight, formFeedback) }
+        person?.let {
+            drawPoseSkeleton(it, viewWidth, viewHeight, formFeedback)
+            if (debugMode) drawDebugLabels(it, viewWidth, viewHeight)
+        }
     }
 }
+
+// Threshold minimum keypoint confidence untuk ditampilkan di skeleton.
+// Harus konsisten dengan CONFIDENCE_THRESHOLD di detektor (BlazePose & MoveNet = 0.5f).
+// Keypoint dengan score di bawah ini TIDAK digambar — mencegah joint salah posisi ikut terhubung.
+private const val MIN_DRAW_CONFIDENCE = 0.4f
 
 // ─── Color Palette ───────────────────────────────────────────────
 
@@ -111,7 +120,7 @@ private fun DrawScope.drawJointGlows(
         viewHeight: Float,
         highlights: Map<Int, FeedbackSeverity>
 ) {
-    val minConfidence = 0.3f
+    val minConfidence = MIN_DRAW_CONFIDENCE
 
     highlights.forEach { (jointIdx, severity) ->
         if (severity == FeedbackSeverity.GOOD) return@forEach // Skip glow for good joints
@@ -173,7 +182,7 @@ private fun DrawScope.drawConnections(
                     Pair(BodyPart.RIGHT_KNEE, BodyPart.RIGHT_ANKLE)
             )
 
-    val minConfidence = 0.3f
+    val minConfidence = MIN_DRAW_CONFIDENCE
 
     connections.forEach { (startIdx, endIdx) ->
         val start = keypoints.getOrNull(startIdx)
@@ -231,7 +240,7 @@ private fun DrawScope.drawKeypoints(
         viewHeight: Float,
         highlights: Map<Int, FeedbackSeverity>
 ) {
-    val minConfidence = 0.3f
+    val minConfidence = MIN_DRAW_CONFIDENCE
     val defaultRadius = 10f
     val highlightedRadius = 14f
 
@@ -267,7 +276,7 @@ private fun DrawScope.drawAngleArcs(
         viewHeight: Float,
         highlights: Map<Int, FeedbackSeverity>
 ) {
-    val minConfidence = 0.3f
+    val minConfidence = MIN_DRAW_CONFIDENCE
 
     // Knee angles (for squat)
     drawAngleArc(
@@ -397,7 +406,7 @@ private fun DrawScope.drawAngleLabels(
         viewWidth: Float,
         viewHeight: Float
 ) {
-    val minConfidence = 0.3f
+    val minConfidence = MIN_DRAW_CONFIDENCE
     val paint =
             android.graphics.Paint().apply {
                 color = android.graphics.Color.WHITE
@@ -484,4 +493,57 @@ private fun DrawScope.drawAngleLabel(
     val labelY = middlePos.y - 10f
 
     drawContext.canvas.nativeCanvas.drawText("${angle.toInt()}°", labelX, labelY, paint)
+}
+
+// ─── Debug Overlay ───────────────────────────────────────────────
+// Aktifkan dengan debugMode = true di PoseVisualization.
+// Menampilkan nama body part dan skor di setiap keypoint — berguna untuk verifikasi
+// bahwa mapping COCO index → body part sudah benar untuk kedua model.
+
+private val DEBUG_SHORT_NAMES = listOf(
+    "nose", "L.eye", "R.eye", "L.ear", "R.ear",
+    "L.sh", "R.sh", "L.el", "R.el",
+    "L.wr", "R.wr", "L.hip", "R.hip",
+    "L.kn", "R.kn", "L.ank", "R.ank"
+)
+
+private fun DrawScope.drawDebugLabels(person: Person, viewWidth: Float, viewHeight: Float) {
+    val paint = android.graphics.Paint().apply {
+        textSize = 22f
+        isAntiAlias = true
+        typeface = android.graphics.Typeface.MONOSPACE
+        setShadowLayer(4f, 1f, 1f, android.graphics.Color.BLACK)
+    }
+
+    person.keypoints.forEachIndexed { index, kp ->
+        // Tampilkan semua keypoint — termasuk yang score rendah — supaya bisa debug
+        val px = kp.x * viewWidth
+        val py = kp.y * viewHeight
+        val name = DEBUG_SHORT_NAMES.getOrElse(index) { "#$index" }
+        val scoreStr = "%.2f".format(kp.score)
+
+        // Warna: hijau jika score >= 0.5, kuning jika 0.2–0.5, merah jika < 0.2
+        paint.color = when {
+            kp.score >= 0.5f -> android.graphics.Color.GREEN
+            kp.score >= 0.2f -> android.graphics.Color.YELLOW
+            else             -> android.graphics.Color.RED
+        }
+
+        // Titik kecil untuk semua keypoint (termasuk yang tidak melewati threshold)
+        drawCircle(
+            color = if (kp.score >= 0.5f) Color(0xFF00E676)
+                    else if (kp.score >= 0.2f) Color(0xFFFFD600)
+                    else Color(0xFFFF1744),
+            radius = 5f,
+            center = Offset(px, py)
+        )
+
+        // Label: "[idx] name\nscore"
+        drawContext.canvas.nativeCanvas.drawText(
+            "[$index]$name", px + 8f, py - 4f, paint
+        )
+        drawContext.canvas.nativeCanvas.drawText(
+            scoreStr, px + 8f, py + 18f, paint
+        )
+    }
 }

@@ -7,9 +7,7 @@ package com.application.skripsiarvan.domain.model
 enum class ExerciseType(val displayName: String) {
     NONE("No Exercise"),
     SQUAT("Squat (Rule-based)"),
-    PUSH_UP("Push-up (Rule-based)"),
-    SQUAT_ML("Squat (ML Classifier)"),
-    PUSH_UP_ML("Push-up (ML Classifier)");
+    PUSH_UP("Push-up (Rule-based)");
 
     companion object {
         fun fromDisplayName(name: String): ExerciseType {

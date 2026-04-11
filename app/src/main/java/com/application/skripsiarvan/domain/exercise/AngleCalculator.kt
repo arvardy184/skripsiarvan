@@ -4,7 +4,6 @@ import android.util.Log
 import com.application.skripsiarvan.domain.model.Keypoint
 import com.application.skripsiarvan.domain.model.Person
 import com.application.skripsiarvan.domain.model.BodyPart
-import kotlin.math.atan2
 import kotlin.math.sqrt
 
 /**
@@ -59,9 +58,12 @@ object AngleCalculator {
         val ankle = person.keypoints.getOrNull(BodyPart.LEFT_ANKLE)
 
         if (hip == null || knee == null || ankle == null) return null
-        if (hip.score < 0.3f || knee.score < 0.3f || ankle.score < 0.3f) return null
+        if (hip.score < 0.2f || knee.score < 0.2f || ankle.score < 0.2f) return null
 
-        return calculateAngle(hip, knee, ankle)
+        val angle = calculateAngle(hip, knee, ankle)
+        // Sudut lutut yang valid secara anatomi: 30°–180°
+        // Di bawah 30° → kemungkinan keypoints terlalu dekat/noisy → buang
+        return if (angle >= 30.0) angle else null
     }
 
     /**
@@ -74,9 +76,10 @@ object AngleCalculator {
         val ankle = person.keypoints.getOrNull(BodyPart.RIGHT_ANKLE)
 
         if (hip == null || knee == null || ankle == null) return null
-        if (hip.score < 0.3f || knee.score < 0.3f || ankle.score < 0.3f) return null
+        if (hip.score < 0.2f || knee.score < 0.2f || ankle.score < 0.2f) return null
 
-        return calculateAngle(hip, knee, ankle)
+        val angle = calculateAngle(hip, knee, ankle)
+        return if (angle >= 30.0) angle else null
     }
 
     /**
@@ -89,9 +92,11 @@ object AngleCalculator {
         val wrist = person.keypoints.getOrNull(BodyPart.LEFT_WRIST)
 
         if (shoulder == null || elbow == null || wrist == null) return null
-        if (shoulder.score < 0.3f || elbow.score < 0.3f || wrist.score < 0.3f) return null
+        if (shoulder.score < 0.2f || elbow.score < 0.2f || wrist.score < 0.2f) return null
 
-        return calculateAngle(shoulder, elbow, wrist)
+        val angle = calculateAngle(shoulder, elbow, wrist)
+        // Sudut siku valid: 20°–180°
+        return if (angle >= 20.0) angle else null
     }
 
     /**
@@ -104,40 +109,44 @@ object AngleCalculator {
         val wrist = person.keypoints.getOrNull(BodyPart.RIGHT_WRIST)
 
         if (shoulder == null || elbow == null || wrist == null) return null
-        if (shoulder.score < 0.3f || elbow.score < 0.3f || wrist.score < 0.3f) return null
+        if (shoulder.score < 0.2f || elbow.score < 0.2f || wrist.score < 0.2f) return null
 
-        return calculateAngle(shoulder, elbow, wrist)
+        val angle = calculateAngle(shoulder, elbow, wrist)
+        return if (angle >= 20.0) angle else null
     }
 
     /**
      * Mendapatkan rata-rata sudut lutut (kiri dan kanan)
      */
+    // Counter untuk throttle log agar tidak spam tiap frame saat benchmark
+    private var kneeLogCounter = 0
+
     fun getAverageKneeAngle(person: Person): Double? {
         val leftAngle = getLeftKneeAngle(person)
         val rightAngle = getRightKneeAngle(person)
 
-        // Debug: Log keypoint confidence
-        val leftKnee = person.keypoints.getOrNull(BodyPart.LEFT_KNEE)
-        val rightKnee = person.keypoints.getOrNull(BodyPart.RIGHT_KNEE)
-        Log.d(TAG, "🦵 Knee confidence - Left: ${leftKnee?.score ?: 0f}, Right: ${rightKnee?.score ?: 0f}")
+        // Log hanya setiap 60 frame — mencegah logcat overhead yang skew CPU metric saat benchmark
+        kneeLogCounter++
+        if (kneeLogCounter % 60 == 0) {
+            val leftKnee = person.keypoints.getOrNull(BodyPart.LEFT_KNEE)
+            val rightKnee = person.keypoints.getOrNull(BodyPart.RIGHT_KNEE)
+            Log.d(TAG, "Knee conf L=${leftKnee?.score?.let { "%.2f".format(it) } ?: "null"} " +
+                       "R=${rightKnee?.score?.let { "%.2f".format(it) } ?: "null"} " +
+                       "angles L=${leftAngle?.let { "%.1f°".format(it) } ?: "null"} " +
+                       "R=${rightAngle?.let { "%.1f°".format(it) } ?: "null"}")
+        }
 
         return when {
             leftAngle != null && rightAngle != null -> {
-                Log.d(TAG, "✅ Using average knee angle: L=%.1f° R=%.1f°".format(leftAngle, rightAngle))
                 (leftAngle + rightAngle) / 2
             }
             leftAngle != null -> {
-                Log.d(TAG, "⚠️ Using only LEFT knee angle: %.1f°".format(leftAngle))
                 leftAngle
             }
             rightAngle != null -> {
-                Log.d(TAG, "⚠️ Using only RIGHT knee angle: %.1f°".format(rightAngle))
                 rightAngle
             }
-            else -> {
-                Log.d(TAG, "❌ No knee angles available (confidence too low or keypoints missing)")
-                null
-            }
+            else -> null
         }
     }
 
