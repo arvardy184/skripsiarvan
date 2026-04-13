@@ -45,25 +45,35 @@ class BenchmarkLogger(private val context: Context) {
     private val startTime = AtomicLong(0L)
     private val endTime = AtomicLong(0L)
 
-    fun startLogging() {
+    @Volatile private var currentSessionLabel: String = ""
+
+    /**
+     * Mulai logging dengan label sesi opsional.
+     * Label digunakan untuk mengidentifikasi kombinasi benchmark di CSV
+     * (misal: "MoveNet_XNNPACK_Squat").
+     */
+    fun startLogging(sessionLabel: String = "") {
         metricsQueue.clear()
         frameCounter.set(0)
         startTime.set(System.currentTimeMillis())
         endTime.set(0L)
+        currentSessionLabel = sessionLabel
         isLogging.set(true)
-        Log.d(TAG, "Benchmark logging started")
+        Log.d(TAG, "Benchmark logging started [session=$sessionLabel]")
     }
 
     fun stopLogging() {
         isLogging.set(false)
         endTime.set(System.currentTimeMillis())
-        Log.d(TAG, "Benchmark logging stopped. Total frames: ${frameCounter.get()}")
+        Log.d(TAG, "Benchmark logging stopped [session=$currentSessionLabel] Total frames: ${frameCounter.get()}")
     }
+
+    fun getCurrentSessionLabel(): String = currentSessionLabel
 
     fun logMetrics(metrics: BenchmarkMetrics) {
         if (!isLogging.get()) return
         val frame = frameCounter.incrementAndGet()
-        metricsQueue.add(metrics.copy(frameNumber = frame))
+        metricsQueue.add(metrics.copy(frameNumber = frame, sessionLabel = currentSessionLabel))
     }
 
     fun isCurrentlyLogging(): Boolean = isLogging.get()

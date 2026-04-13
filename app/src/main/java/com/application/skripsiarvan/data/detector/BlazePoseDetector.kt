@@ -53,16 +53,28 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         // KEDUA model secara simetris. BlazePose tidak punya internal warm-up sendiri agar
         // behavior identik dengan MoveNet — penting untuk fairness perbandingan di skripsi.
 
-        // Alpha EMA temporal smoothing — IDENTIK dengan MoveNet (0.2f) untuk perbandingan fair.
-        // Nilai ini dikontrol sama di kedua model (Bab 3 Metodologi: post-processing pipeline identik).
-        private const val EMA_ALPHA = 0.2f
+        // Alpha EMA — dinaikkan 0.2 → 0.4 agar responsif untuk gerakan dinamis (squat).
+        // Di 15fps, alpha=0.2 menghasilkan lag ~5 frame (80% bobot ke frame lama). Untuk
+        // squat 3 detik turun, sudut lutut raw sudah ~100° tapi smoothed masih ~135°
+        // sehingga threshold 110° tidak pernah tersentuh. Identik dengan MoveNet fix.
+        private const val EMA_ALPHA = 0.4f
 
-        // Deadband: pergerakan < nilai ini (normalized [0,1]) diabaikan — tidak update posisi.
-        // 0.008 ≈ <1% lebar layar: menekan micro-jitter yang tidak berarti secara visual.
+        // Alpha untuk keypoint low-confidence — tetap smoothing, tapi pelan.
+        // Sebelumnya: keypoint <0.4 di-FREEZE ke posisi prev → saat orang squat,
+        // visibility hip/knee/ankle sering dip <0.4 dan koordinatnya terkunci di
+        // posisi berdiri, sehingga sudut lutut stuck di ~170°. Ini root cause
+        // "0 reps kehitung" di BlazePose.
+        private const val EMA_ALPHA_LOW = 0.1f
+
+        // Deadband: pergerakan < nilai ini (normalized [0,1]) diabaikan.
         private const val EMA_DEADBAND = 0.008f
 
-        // Keypoint dengan score di bawah ini dianggap "tidak terdeteksi dengan baik".
-        private const val EMA_LOW_CONF_THRESHOLD = 0.4f
+        // Threshold "sangat rendah" — HARUS << CONFIDENCE_THRESHOLD (0.3) supaya
+        // tidak ada kondisi "person detected tapi keypoint dibekukan".
+        private const val EMA_LOW_CONF_THRESHOLD = 0.15f
+
+        // Batas kegagalan berturut-turut sebelum EMA history di-clear.
+        private const val MAX_CONSECUTIVE_FAILURES = 10
 
         // Pemetaan indeks COCO 17 → indeks BlazePose 33
         // Referensi urutan BlazePose: 0=nose, 1=left_eye_inner, 2=left_eye, 3=left_eye_outer,
@@ -115,6 +127,8 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
 
     // ── Buffer EMA temporal smoothing ───────────────────────────────────────────────────────────
     private var previousKeypoints: FloatArray? = null
+    private var consecutiveFailureCount = 0
+    private var rawLogCounter = 0
 
     // ── Buffer output tensor ke-1 (global pose presence score, opsional) ────────────────────────
     // BlazePose TFLite kadang punya output tensor kedua berisi skor kehadiran pose secara global.
@@ -221,7 +235,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                         if (frameCount % 30 == 0) {
                             Log.v(TAG, "Global presence terlalu rendah: ${"%.3f".format(globalPresence)} — tidak ada orang")
                         }
-                        resetTemporalSmoothing()
+                        handleDetectionFailure()
                         return null
                     }
                 }
@@ -281,10 +295,28 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
 
                 val avgScore = totalScore / NUM_KEYPOINTS
 
+                // Log raw keypoint hip/knee/ankle tiap 10 frame — untuk verifikasi
+                // model menghasilkan koordinat yang bergerak saat squat (sebelum EMA).
+                rawLogCounter++
+                if (rawLogCounter % 10 == 0) {
+                    val lh = keypoints[11]; val rh = keypoints[12]
+                    val lk = keypoints[13]; val rk = keypoints[14]
+                    val la = keypoints[15]; val ra = keypoints[16]
+                    Log.d(TAG, ("RAW f=%d avg=%.2f | " +
+                        "LHip[y=%.2f s=%.2f] RHip[y=%.2f s=%.2f] | " +
+                        "LKnee[y=%.2f s=%.2f] RKnee[y=%.2f s=%.2f] | " +
+                        "LAnk[y=%.2f s=%.2f] RAnk[y=%.2f s=%.2f]").format(
+                        rawLogCounter, avgScore,
+                        lh.y, lh.score, rh.y, rh.score,
+                        lk.y, lk.score, rk.y, rk.score,
+                        la.y, la.score, ra.y, ra.score))
+                }
+
                 // Terapkan EMA temporal smoothing
                 val smoothedKeypoints = applyTemporalSmoothing(keypoints, currentRawKeypoints)
 
                 return if (avgScore >= CONFIDENCE_THRESHOLD) {
+                    consecutiveFailureCount = 0
                     if (!firstDetectionLogged) {
                         firstDetectionLogged = true
                         val nose      = smoothedKeypoints[0]
@@ -299,7 +331,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                     }
                     Person(keypoints = smoothedKeypoints, score = avgScore)
                 } else {
-                    resetTemporalSmoothing()
+                    handleDetectionFailure()
                     null
                 }
 
@@ -396,32 +428,21 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
             }
 
             val kp = rawKeypoints[i]
-            if (kp.score < EMA_LOW_CONF_THRESHOLD) {
-                // Keypoint confidence rendah → pakai posisi PREVIOUS yang stabil.
-                // Menghindari jitter dari output model yang noisy untuk keypoint yang
-                // setengah terlihat. Ghost tidak jadi masalah karena global presence gate
-                // akan reset semua EMA saat orang benar-benar pergi dari frame.
-                val sx = prevKps[idx]
-                val sy = prevKps[idx + 1]
-                smoothedValues[idx]     = sx
-                smoothedValues[idx + 1] = sy
-                smoothedKeypoints.add(kp.copy(x = sx, y = sy))
-            } else {
-                // EMA normal untuk keypoint yang terdeteksi dengan baik
-                val candidateX = EMA_ALPHA * currentRawValues[idx]     + (1 - EMA_ALPHA) * prevKps[idx]
-                val candidateY = EMA_ALPHA * currentRawValues[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
+            // Adaptive alpha: keypoint low-conf tetap ikut bergerak (alpha kecil),
+            // tidak lagi di-freeze. Freeze lama menyebabkan 0 reps di squat karena
+            // lower-body keypoint sering dip di bawah threshold saat foreshortened.
+            val alpha = if (kp.score < EMA_LOW_CONF_THRESHOLD) EMA_ALPHA_LOW else EMA_ALPHA
+            val candidateX = alpha * currentRawValues[idx]     + (1 - alpha) * prevKps[idx]
+            val candidateY = alpha * currentRawValues[idx + 1] + (1 - alpha) * prevKps[idx + 1]
 
-                // Deadband: jika pergerakan dari posisi sebelumnya sangat kecil (<0.8% layar),
-                // pertahankan posisi lama — menghilangkan micro-jitter saat orang diam.
-                val dx = kotlin.math.abs(candidateX - prevKps[idx])
-                val dy = kotlin.math.abs(candidateY - prevKps[idx + 1])
-                val sx = if (dx > EMA_DEADBAND) candidateX else prevKps[idx]
-                val sy = if (dy > EMA_DEADBAND) candidateY else prevKps[idx + 1]
+            val dx = kotlin.math.abs(candidateX - prevKps[idx])
+            val dy = kotlin.math.abs(candidateY - prevKps[idx + 1])
+            val sx = if (dx > EMA_DEADBAND) candidateX else prevKps[idx]
+            val sy = if (dy > EMA_DEADBAND) candidateY else prevKps[idx + 1]
 
-                smoothedValues[idx]     = sx
-                smoothedValues[idx + 1] = sy
-                smoothedKeypoints.add(kp.copy(x = sx, y = sy))
-            }
+            smoothedValues[idx]     = sx
+            smoothedValues[idx + 1] = sy
+            smoothedKeypoints.add(kp.copy(x = sx, y = sy))
         }
 
         previousKeypoints = smoothedValues
@@ -429,11 +450,15 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     }
 
     /**
-     * Reset buffer EMA agar posisi keypoint orang yang sudah pergi tidak "hantu"
-     * ke frame berikutnya. Dipanggil saat pose tidak terdeteksi.
+     * Tangani kegagalan deteksi. Tidak langsung me-null-kan `previousKeypoints` karena
+     * dip sesaat di avgScore saat fase bawah squat akan menyebabkan angle melompat
+     * setiap kembali terdeteksi. Baru clear setelah N frame berturut-turut gagal.
      */
-    private fun resetTemporalSmoothing() {
-        previousKeypoints = null
+    private fun handleDetectionFailure() {
+        consecutiveFailureCount++
+        if (consecutiveFailureCount > MAX_CONSECUTIVE_FAILURES) {
+            previousKeypoints = null
+        }
     }
 
     /**

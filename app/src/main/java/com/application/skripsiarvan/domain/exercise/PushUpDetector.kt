@@ -35,21 +35,32 @@ class PushUpDetector : ExerciseDetector {
     companion object {
         private const val TAG = "PushUpDetector"
 
-        // Thresholds (relaxed for BlazePose compatibility)
-        private const val ANGLE_UP_ENTER = 155.0 // Lengan lurus (tidak harus lockout sempurna)
-        private const val ANGLE_UP_EXIT = 140.0 // Mulai menekuk (lowered for sensitivity)
+        // ── UP thresholds ────────────────────────────────────────────────────────────────
+        // Diturunkan 155° → 140°. Dari log benchmark sebelumnya, rep hanya commit saat
+        // elbow smoothed mencapai 155–162° — padahal dari kamera depan dengan
+        // foreshortening + EMA lag, push-up natural sering max hanya di ~140–150°.
+        // Akibatnya 10–25 push-up real hanya terhitung 5 rep. 140° sudah cukup untuk
+        // membedakan "lengan lurus" dari "sedang turun/naik".
+        private const val ANGLE_UP_ENTER = 140.0
+        private const val ANGLE_UP_EXIT = 125.0 // Hysteresis 15° dari ENTER
 
-        // Push-up bottom threshold — dilonggarkan ke 110° agar kompatibel dengan FPS rendah (<15fps).
-        // Pada 10fps, window=7 menghasilkan ~8° lag → smoothed tidak pernah sentuh 100°.
-        // 110° ≈ siku masih menekuk cukup dalam untuk ROM yang valid.
-        private const val ANGLE_DOWN_ENTER = 110.0
-        private const val ANGLE_DOWN_EXIT = 120.0 // Hysteresis tetap 10° dari ENTER
+        // ── DOWN thresholds ──────────────────────────────────────────────────────────────
+        // Dinaikkan 110° → 115° agar lebih mudah dicapai (quarter push-up juga counts).
+        private const val ANGLE_DOWN_ENTER = 115.0
+        private const val ANGLE_DOWN_EXIT = 125.0 // Hysteresis 10° dari ENTER
 
-        // Window=3: lag hanya ~100ms di 10fps (vs 300ms dengan window=7).
         private const val SMOOTHING_WINDOW_SIZE = 3
 
         // Temporal constraints (ms)
-        private const val MIN_DOWN_HOLD_MS = 150L // Turunkan sedikit agar lebih responsive
+        private const val MIN_DOWN_HOLD_MS = 150L
+
+        // Jumlah frame berturut-turut sebelum abort state transition. Mencegah oscillation
+        // DOWN ↔ GOING_UP / UP ↔ GOING_DOWN akibat satu frame noisy yang menyeberang
+        // threshold. Dari log terlihat pola "DOWN→GOING_UP→DOWN→GOING_UP→..." yang
+        // menelan beberapa push-up real menjadi satu siklus state.
+        private const val ABORT_CONFIRMATION_FRAMES = 3
+
+        private const val VERBOSE_FRAME_LOG = true
     }
 
     private var repetitionCount = 0
@@ -61,6 +72,10 @@ class PushUpDetector : ExerciseDetector {
 
     // State timing
     private var stateStartTime = 0L
+
+    // Hysteresis counters untuk menolak transisi dari 1 frame noisy
+    private var consecutiveAboveUpCount = 0
+    private var consecutiveBelowDownCount = 0
 
     private enum class PushUpState {
         UP, // > 160° (Plank)
@@ -97,14 +112,21 @@ class PushUpDetector : ExerciseDetector {
             }
             PushUpState.GOING_DOWN -> {
                 if (smoothedAngle <= ANGLE_DOWN_ENTER) {
-                    // Masuk posisi bawah (Bottom position)
+                    consecutiveAboveUpCount = 0
                     transitionTo(PushUpState.DOWN, currentTime)
                     exerciseState = ExerciseState.IN_MOTION
                 } else if (smoothedAngle > ANGLE_UP_ENTER) {
-                    // Batal turun, kembali ke posisi plank (False start)
-                    transitionTo(PushUpState.UP, currentTime)
-                    exerciseState = ExerciseState.IDLE
+                    // Kandidat batal turun — butuh N frame sebelum commit kembali ke UP.
+                    consecutiveAboveUpCount++
+                    if (consecutiveAboveUpCount >= ABORT_CONFIRMATION_FRAMES) {
+                        consecutiveAboveUpCount = 0
+                        transitionTo(PushUpState.UP, currentTime)
+                        exerciseState = ExerciseState.IDLE
+                    } else {
+                        exerciseState = ExerciseState.IN_MOTION
+                    }
                 } else {
+                    consecutiveAboveUpCount = 0
                     exerciseState = ExerciseState.IN_MOTION
                 }
             }
@@ -133,22 +155,33 @@ class PushUpDetector : ExerciseDetector {
             }
             PushUpState.GOING_UP -> {
                 if (smoothedAngle >= ANGLE_UP_ENTER) {
-                    // Selesai satu repetisi (Lockout)
+                    consecutiveBelowDownCount = 0
                     transitionTo(PushUpState.UP, currentTime)
                     repetitionCount++
-                    Log.d(
-                            TAG,
-                            "✅ REP COMPLETED! Total: $repetitionCount (Elbow: ${String.format("%.1f", smoothedAngle)}°)"
-                    )
+                    Log.d(TAG, "✅ REP COMPLETED! Total: $repetitionCount (Elbow: ${"%.1f".format(smoothedAngle)}°)")
                     exerciseState = ExerciseState.COMPLETED
                 } else if (smoothedAngle < ANGLE_DOWN_ENTER) {
-                    // Turun lagi (gagal naik penuh)
-                    transitionTo(PushUpState.DOWN, currentTime)
-                    exerciseState = ExerciseState.IN_MOTION
+                    // Kandidat turun lagi — butuh N frame sebelum commit kembali ke DOWN.
+                    // Tanpa hysteresis ini, satu dip noisy menyebabkan DOWN↔GOING_UP
+                    // bouncing yang menelan beberapa push-up real.
+                    consecutiveBelowDownCount++
+                    if (consecutiveBelowDownCount >= ABORT_CONFIRMATION_FRAMES) {
+                        consecutiveBelowDownCount = 0
+                        transitionTo(PushUpState.DOWN, currentTime)
+                        exerciseState = ExerciseState.IN_MOTION
+                    } else {
+                        exerciseState = ExerciseState.IN_MOTION
+                    }
                 } else {
+                    consecutiveBelowDownCount = 0
                     exerciseState = ExerciseState.IN_MOTION
                 }
             }
+        }
+
+        if (VERBOSE_FRAME_LOG) {
+            Log.d(TAG, "frame raw=%.1f smoothed=%.1f delta=%.2f state=%s reps=%d".format(
+                rawAngle, smoothedAngle, delta, currentState, repetitionCount))
         }
 
         return exerciseState
@@ -178,5 +211,7 @@ class PushUpDetector : ExerciseDetector {
         angleBuffer.clear()
         lastSmoothedAngle = null
         stateStartTime = 0L
+        consecutiveAboveUpCount = 0
+        consecutiveBelowDownCount = 0
     }
 }

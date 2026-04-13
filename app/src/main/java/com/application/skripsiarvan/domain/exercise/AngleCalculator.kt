@@ -116,38 +116,37 @@ object AngleCalculator {
     }
 
     /**
-     * Mendapatkan rata-rata sudut lutut (kiri dan kanan)
+     * Mendapatkan rata-rata sudut lutut (kiri dan kanan).
+     *
+     * Bila hasilnya null, log tiap frame WHY — keypoint mana yang gagal lolos threshold
+     * confidence (0.2) dan berapa skornya. Kritikal untuk mendiagnosa kenapa squat
+     * tidak terdeteksi: biasanya karena hip/knee/ankle punya skor di bawah threshold.
      */
-    // Counter untuk throttle log agar tidak spam tiap frame saat benchmark
-    private var kneeLogCounter = 0
-
     fun getAverageKneeAngle(person: Person): Double? {
         val leftAngle = getLeftKneeAngle(person)
         val rightAngle = getRightKneeAngle(person)
 
-        // Log hanya setiap 60 frame — mencegah logcat overhead yang skew CPU metric saat benchmark
-        kneeLogCounter++
-        if (kneeLogCounter % 60 == 0) {
-            val leftKnee = person.keypoints.getOrNull(BodyPart.LEFT_KNEE)
-            val rightKnee = person.keypoints.getOrNull(BodyPart.RIGHT_KNEE)
-            Log.d(TAG, "Knee conf L=${leftKnee?.score?.let { "%.2f".format(it) } ?: "null"} " +
-                       "R=${rightKnee?.score?.let { "%.2f".format(it) } ?: "null"} " +
-                       "angles L=${leftAngle?.let { "%.1f°".format(it) } ?: "null"} " +
-                       "R=${rightAngle?.let { "%.1f°".format(it) } ?: "null"}")
-        }
-
-        return when {
-            leftAngle != null && rightAngle != null -> {
-                (leftAngle + rightAngle) / 2
-            }
-            leftAngle != null -> {
-                leftAngle
-            }
-            rightAngle != null -> {
-                rightAngle
-            }
+        val result = when {
+            leftAngle != null && rightAngle != null -> (leftAngle + rightAngle) / 2
+            leftAngle != null -> leftAngle
+            rightAngle != null -> rightAngle
             else -> null
         }
+
+        if (result == null) {
+            val lh = person.keypoints.getOrNull(BodyPart.LEFT_HIP)
+            val lk = person.keypoints.getOrNull(BodyPart.LEFT_KNEE)
+            val la = person.keypoints.getOrNull(BodyPart.LEFT_ANKLE)
+            val rh = person.keypoints.getOrNull(BodyPart.RIGHT_HIP)
+            val rk = person.keypoints.getOrNull(BodyPart.RIGHT_KNEE)
+            val ra = person.keypoints.getOrNull(BodyPart.RIGHT_ANKLE)
+            Log.d(TAG, ("knee=null (threshold=0.20) | " +
+                "L hip=%.2f knee=%.2f ank=%.2f | R hip=%.2f knee=%.2f ank=%.2f").format(
+                lh?.score ?: -1f, lk?.score ?: -1f, la?.score ?: -1f,
+                rh?.score ?: -1f, rk?.score ?: -1f, ra?.score ?: -1f))
+        }
+
+        return result
     }
 
     /**

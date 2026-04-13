@@ -20,19 +20,21 @@ data class BenchmarkMetrics(
     val repetitionCount: Int = 0,
     val frameNumber: Int = 0,
     // Apakah pose berhasil terdeteksi di frame ini — untuk hitung detection rate
-    val poseDetected: Boolean = false
+    val poseDetected: Boolean = false,
+    // Label sesi untuk membedakan kombinasi benchmark (misal: "MoveNet_XNNPACK_Squat")
+    val sessionLabel: String = ""
 ) {
     fun toCsvLine(): String {
         return "$timestamp,$modelType,$delegateType,$inferenceTimeMs,$processingTimeMs,$fps," +
                "$cpuUsagePercent,$memoryUsageMb,$powerConsumptionMw," +
-               "$exerciseType,$repetitionCount,$frameNumber,${if (poseDetected) 1 else 0}"
+               "$exerciseType,$repetitionCount,$frameNumber,${if (poseDetected) 1 else 0},$sessionLabel"
     }
 
     companion object {
         fun getCsvHeader(): String {
             return "timestamp,model_type,delegate_type,inference_time_ms,processing_time_ms,fps," +
                    "cpu_usage_percent,memory_usage_mb,power_consumption_mw," +
-                   "exercise_type,repetition_count,frame_number,pose_detected"
+                   "exercise_type,repetition_count,frame_number,pose_detected,session_label"
         }
     }
 }

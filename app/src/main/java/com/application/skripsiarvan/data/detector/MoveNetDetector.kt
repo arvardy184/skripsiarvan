@@ -22,18 +22,37 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
         private const val TAG = "MoveNetDetector"
         private const val INPUT_SIZE = 192
         private const val NUM_KEYPOINTS = 17
+
+        // Avg-score threshold: orang dianggap "ada" jika rata-rata score ≥ ini.
         private const val CONFIDENCE_THRESHOLD = 0.3f
 
-        // EMA smoothing — IDENTIK dengan BlazePose (0.2f) untuk perbandingan fair.
-        // Post-processing pipeline dikontrol sama di kedua model (Bab 3 Metodologi).
-        private const val EMA_ALPHA = 0.2f
+        // EMA alpha — dinaikkan dari 0.2 → 0.4 agar responsif untuk gerakan dinamis (squat).
+        // Rasional: di 15fps, alpha=0.2 membuat smoothed signal lag ~5 frame di balik posisi
+        // sebenarnya (80% bobot ke frame lama). Untuk squat 3 detik turun + 3 detik naik,
+        // sudut lutut yang sebenarnya sudah menyentuh 100° tapi smoothed masih ~135°.
+        // Alpha 0.4 menyeimbangkan noise suppression dan responsiveness (lag ~2 frame).
+        private const val EMA_ALPHA = 0.4f
 
-        // Deadband — IDENTIK dengan BlazePose (0.008f).
+        // Alpha untuk keypoint dengan confidence rendah — tetap smoothing tapi izinkan gerakan.
+        // Sebelumnya: keypoint <0.4 di-FREEZE ke posisi sebelumnya → hip/knee/ankle
+        // terkunci di posisi berdiri sepanjang squat (MoveNet Lightning sering beri score
+        // <0.4 saat lower-body foreshortened dari kamera depan). Ini penyebab 0 reps.
+        private const val EMA_ALPHA_LOW = 0.1f
+
+        // Deadband kecil untuk meredam jitter sub-pixel saat diam.
         private const val EMA_DEADBAND = 0.008f
 
-        // Threshold confidence rendah — IDENTIK dengan BlazePose (0.4f).
-        // Keypoint dengan score < nilai ini dibekukan ke posisi sebelumnya (tidak di-EMA).
-        private const val EMA_LOW_CONF_THRESHOLD = 0.4f
+        // Threshold "sangat rendah" — HARUS << CONFIDENCE_THRESHOLD (0.3).
+        // Kalau avgScore lolos 0.3 berarti orang terdeteksi; tidak masuk akal lalu
+        // memfreeze keypoint pada threshold lebih tinggi (0.4) — itu yang membuat
+        // "person detected tapi lower-body tidak bergerak".
+        // 0.15 hanya menyaring keypoint yang benar-benar junk (mis. di luar frame).
+        private const val EMA_LOW_CONF_THRESHOLD = 0.15f
+
+        // Batas kegagalan berturut-turut sebelum EMA history di-clear sepenuhnya.
+        // Selama ≤N frame gagal, kita pertahankan prev keypoints sebagai base EMA
+        // agar angle tidak melompat saat avgScore dip sesaat (sering di fase bawah squat).
+        private const val MAX_CONSECUTIVE_FAILURES = 10
     }
 
     private val imageProcessor by lazy {
@@ -59,6 +78,8 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
 
     // Buffer EMA: menyimpan koordinat [x0,y0, x1,y1, ..., x16,y16] dari frame sebelumnya
     private var previousKeypoints: FloatArray? = null
+    private var consecutiveFailureCount = 0
+    private var rawLogCounter = 0
 
     override fun detectPose(bitmap: Bitmap): Person? {
         synchronized(lock) {
@@ -97,22 +118,38 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
                 } else {
                     keypoints.mapIndexed { i, kp ->
                         val idx = i * 2
-                        if (kp.score < EMA_LOW_CONF_THRESHOLD) {
-                            // Confidence rendah → bekukan ke posisi sebelumnya (identik dengan BlazePose)
-                            kp.copy(x = prevKps[idx], y = prevKps[idx + 1])
-                        } else {
-                            val candidateX = EMA_ALPHA * currentRaw[idx]     + (1 - EMA_ALPHA) * prevKps[idx]
-                            val candidateY = EMA_ALPHA * currentRaw[idx + 1] + (1 - EMA_ALPHA) * prevKps[idx + 1]
-                            val dx = kotlin.math.abs(candidateX - prevKps[idx])
-                            val dy = kotlin.math.abs(candidateY - prevKps[idx + 1])
-                            val sx = if (dx > EMA_DEADBAND) candidateX else prevKps[idx]
-                            val sy = if (dy > EMA_DEADBAND) candidateY else prevKps[idx + 1]
-                            kp.copy(x = sx, y = sy)
-                        }
+                        // Low-conf keypoint: gunakan alpha kecil (0.1) — tetap bergerak
+                        // pelan mengikuti sinyal baru, tapi jangan di-freeze (bug lama).
+                        val alpha = if (kp.score < EMA_LOW_CONF_THRESHOLD) EMA_ALPHA_LOW else EMA_ALPHA
+                        val candidateX = alpha * currentRaw[idx]     + (1 - alpha) * prevKps[idx]
+                        val candidateY = alpha * currentRaw[idx + 1] + (1 - alpha) * prevKps[idx + 1]
+                        val dx = kotlin.math.abs(candidateX - prevKps[idx])
+                        val dy = kotlin.math.abs(candidateY - prevKps[idx + 1])
+                        val sx = if (dx > EMA_DEADBAND) candidateX else prevKps[idx]
+                        val sy = if (dy > EMA_DEADBAND) candidateY else prevKps[idx + 1]
+                        kp.copy(x = sx, y = sy)
                     }
                 }
 
+                // Per-10-frame raw keypoint log: verifikasi model menerima gambar bagus
+                // dan memproduksi nilai mentah yang masuk akal (sebelum EMA).
+                rawLogCounter++
+                if (rawLogCounter % 10 == 0) {
+                    val lh = keypoints[11]; val rh = keypoints[12]
+                    val lk = keypoints[13]; val rk = keypoints[14]
+                    val la = keypoints[15]; val ra = keypoints[16]
+                    Log.d(TAG, ("RAW f=%d avg=%.2f | " +
+                        "LHip[y=%.2f x=%.2f s=%.2f] RHip[y=%.2f x=%.2f s=%.2f] | " +
+                        "LKnee[y=%.2f x=%.2f s=%.2f] RKnee[y=%.2f x=%.2f s=%.2f] | " +
+                        "LAnk[y=%.2f x=%.2f s=%.2f] RAnk[y=%.2f x=%.2f s=%.2f]").format(
+                        rawLogCounter, avgScore,
+                        lh.y, lh.x, lh.score, rh.y, rh.x, rh.score,
+                        lk.y, lk.x, lk.score, rk.y, rk.x, rk.score,
+                        la.y, la.x, la.score, ra.y, ra.x, ra.score))
+                }
+
                 return if (avgScore >= CONFIDENCE_THRESHOLD) {
+                    consecutiveFailureCount = 0
                     previousKeypoints = FloatArray(NUM_KEYPOINTS * 2) { i ->
                         val kpIdx = i / 2
                         if (i % 2 == 0) smoothedKeypoints[kpIdx].x else smoothedKeypoints[kpIdx].y
@@ -129,7 +166,14 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
                     }
                     Person(keypoints = smoothedKeypoints, score = avgScore)
                 } else {
-                    previousKeypoints = null  // reset EMA saat orang tidak terdeteksi
+                    // Jangan langsung reset EMA history. Kegagalan sesaat (avgScore dip
+                    // di <0.3 saat fase bawah squat) sangat umum — reset menyebabkan
+                    // angle melompat drastis begitu deteksi kembali. Pertahankan posisi
+                    // terakhir sebagai base EMA sampai N frame gagal berturut-turut.
+                    consecutiveFailureCount++
+                    if (consecutiveFailureCount > MAX_CONSECUTIVE_FAILURES) {
+                        previousKeypoints = null
+                    }
                     null
                 }
             } catch (e: Exception) {

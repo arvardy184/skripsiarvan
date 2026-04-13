@@ -261,15 +261,18 @@ class PoseImageAnalyzer(
     /**
      * Validasi geometri pose — memastikan keypoint mapping sudah benar.
      *
-     * Aturan yang diperiksa (semua berbasis koordinat normalized [0,1], y=0 atas):
-     * 1. Nose (y) < Shoulder (y)        — hidung di atas bahu
-     * 2. Shoulder (y) < Hip (y)         — bahu di atas pinggul
-     * 3. Hip (y) < Knee (y)             — pinggul di atas lutut
-     * 4. Knee (y) < Ankle (y)           — lutut di atas pergelangan kaki
-     * 5. L.Shoulder.x > R.Shoulder.x    — di kamera mirror, kiri secara visual ada di kanan pixel
+     * Otomatis memilih set aturan berdasarkan ORIENTASI TUBUH:
      *
-     * Jika ada aturan yang dilanggar secara konsisten → kemungkinan ada swap x/y atau
-     * mapping COCO index yang salah.
+     * VERTICAL (berdiri — squat, idle):
+     *   nose.y < shoulder.y < hip.y < knee.y < ankle.y
+     *
+     * HORIZONTAL (push-up / plank — badan memanjang horizontal):
+     *   Aturan y-ordering tidak berlaku karena bahu, pinggul, lutut hampir satu garis y.
+     *   Sebagai gantinya: cek x-ordering kepala↔kaki (tergantung hadap kiri/kanan).
+     *
+     * Deteksi orientasi: bandingkan selisih |shoulder.y - ankle.y| (vertikal extent)
+     * dengan |shoulder.x - ankle.x| (horizontal extent). Badan horizontal kalau
+     * horizontal extent > vertical extent.
      *
      * Hanya di-log setiap 60 frame agar tidak spam.
      */
@@ -280,24 +283,58 @@ class PoseImageAnalyzer(
         val minScore = 0.5f
         val violations = mutableListOf<String>()
 
-        fun check(conditionName: String, a: Int, b: Int, aLabel: String, bLabel: String, checkY: Boolean) {
-            val ka = kp[a]; val kb = kp[b]
-            if (ka.score < minScore || kb.score < minScore) return
-            val aVal = if (checkY) ka.y else ka.x
-            val bVal = if (checkY) kb.y else kb.x
+        fun check(conditionName: String, aVal: Float, bVal: Float, aLabel: String, bLabel: String) {
             if (aVal >= bVal) violations.add("$conditionName: $aLabel(${"%4.2f".format(aVal)}) should be < $bLabel(${"%4.2f".format(bVal)})")
         }
 
-        // Y-axis checks (y=0 adalah atas layar)
-        check("nose<shoulder", 0, 5, "nose.y", "L.sh.y", checkY = true)
-        check("shoulder<hip", 5, 11, "L.sh.y", "L.hip.y", checkY = true)
-        check("hip<knee", 11, 13, "L.hip.y", "L.kn.y", checkY = true)
-        check("knee<ankle", 13, 15, "L.kn.y", "L.ank.y", checkY = true)
+        val lShoulder = kp[5]
+        val lHip = kp[11]
+        val lAnkle = kp[15]
+
+        // Butuh minimal shoulder + hip untuk menentukan orientasi
+        if (lShoulder.score < minScore || lHip.score < minScore) {
+            return
+        }
+
+        val torsoDy = kotlin.math.abs(lShoulder.y - lHip.y)
+        val torsoDx = kotlin.math.abs(lShoulder.x - lHip.x)
+        val isHorizontal = torsoDx > torsoDy
+
+        if (isHorizontal) {
+            // Mode push-up / plank: cek bahwa bahu, pinggul, pergelangan kaki kira-kira
+            // segaris secara y (body line lurus). Toleransi cukup longgar karena ada
+            // perspektif kamera.
+            if (lAnkle.score >= minScore) {
+                val bodyYRange = maxOf(lShoulder.y, lHip.y, lAnkle.y) -
+                                 minOf(lShoulder.y, lHip.y, lAnkle.y)
+                if (bodyYRange > 0.35f) {
+                    violations.add("pushup body not aligned: y-range=${"%.2f".format(bodyYRange)}")
+                }
+            }
+            if (violations.isEmpty()) {
+                Log.d(TAG, "✅ Sanity OK [pushup]: frame=$totalFrameCount, score=${"%.2f".format(person.score)}")
+            } else {
+                Log.w(TAG, "⚠️ Sanity FAIL [pushup] (frame=$totalFrameCount): ${violations.joinToString(" | ")}")
+            }
+            return
+        }
+
+        // Mode berdiri: nose<shoulder<hip<knee<ankle (y=0 adalah atas layar)
+        val nose = kp[0]
+        val lKnee = kp[13]
+        if (nose.score >= minScore && lShoulder.score >= minScore)
+            check("nose<shoulder", nose.y, lShoulder.y, "nose.y", "L.sh.y")
+        if (lShoulder.score >= minScore && lHip.score >= minScore)
+            check("shoulder<hip", lShoulder.y, lHip.y, "L.sh.y", "L.hip.y")
+        if (lHip.score >= minScore && lKnee.score >= minScore)
+            check("hip<knee", lHip.y, lKnee.y, "L.hip.y", "L.kn.y")
+        if (lKnee.score >= minScore && lAnkle.score >= minScore)
+            check("knee<ankle", lKnee.y, lAnkle.y, "L.kn.y", "L.ank.y")
 
         if (violations.isEmpty()) {
-            Log.d(TAG, "✅ Sanity OK: frame=$totalFrameCount, score=${"%.2f".format(person.score)}")
+            Log.d(TAG, "✅ Sanity OK [standing]: frame=$totalFrameCount, score=${"%.2f".format(person.score)}")
         } else {
-            Log.w(TAG, "⚠️ Sanity FAIL (frame=$totalFrameCount): ${violations.joinToString(" | ")}")
+            Log.w(TAG, "⚠️ Sanity FAIL [standing] (frame=$totalFrameCount): ${violations.joinToString(" | ")}")
         }
     }
 
@@ -325,33 +362,96 @@ class PoseImageAnalyzer(
     )
 }
 
-/** Extension: Convert ImageProxy to Bitmap secara efisien */
+/**
+ * Extension: Convert ImageProxy (YUV_420_888) to Bitmap.
+ *
+ * CameraX's YUV_420_888 is NOT guaranteed to be contiguous NV21. Depending on the device:
+ *   - Y plane may have rowStride != width (row padding)
+ *   - U/V planes may have pixelStride == 2 (semi-planar, interleaved VU/UV)
+ *     or pixelStride == 1 (fully planar I420).
+ *
+ * Bulk-copying U/V planes straight into an NV21 byte array (the previous buggy approach)
+ * produces striped/corrupt chroma on devices with pixelStride=2 or row padding. MoveNet
+ * then sees a garbled image and emits "ngawur" keypoints.
+ *
+ * This implementation:
+ *   1. Copies the Y plane row-by-row, respecting rowStride, to strip padding.
+ *   2. Interleaves V then U per chroma sample into the NV21 buffer, honouring both
+ *      uvRowStride and uvPixelStride — correct for both NV21 (pixelStride=2) and I420
+ *      (pixelStride=1) source layouts.
+ */
 private fun ImageProxy.toBitmapCustom(): Bitmap {
-    val yBuffer = planes[0].buffer // Y
-    val uBuffer = planes[1].buffer // U
-    val vBuffer = planes[2].buffer // V
+    val w = width
+    val h = height
+    val ySize = w * h
+    val uvSize = w * h / 2  // total chroma bytes in NV21 (interleaved V,U at half resolution)
+    val nv21 = ByteArray(ySize + uvSize)
 
-    val ySize = yBuffer.remaining()
-    val uSize = uBuffer.remaining()
-    val vSize = vBuffer.remaining()
+    val yPlane = planes[0]
+    val uPlane = planes[1]
+    val vPlane = planes[2]
 
-    val nv21 = ByteArray(ySize + uSize + vSize)
+    val yBuffer = yPlane.buffer
+    val uBuffer = uPlane.buffer
+    val vBuffer = vPlane.buffer
 
-    yBuffer.get(nv21, 0, ySize)
-    vBuffer.get(nv21, ySize, vSize)
-    uBuffer.get(nv21, ySize + vSize, uSize)
+    // --- Y plane: copy row by row, stripping any row padding ---
+    val yRowStride = yPlane.rowStride
+    val yPixelStride = yPlane.pixelStride
+    var dst = 0
+    if (yPixelStride == 1 && yRowStride == w) {
+        // Fast path: tightly packed
+        yBuffer.position(0)
+        yBuffer.get(nv21, 0, ySize)
+        dst = ySize
+    } else {
+        val rowBuf = ByteArray(yRowStride)
+        for (row in 0 until h) {
+            val rowStart = row * yRowStride
+            yBuffer.position(rowStart)
+            val toRead = minOf(yRowStride, yBuffer.remaining())
+            yBuffer.get(rowBuf, 0, toRead)
+            if (yPixelStride == 1) {
+                System.arraycopy(rowBuf, 0, nv21, dst, w)
+                dst += w
+            } else {
+                // Rare, but respect pixelStride if present
+                for (col in 0 until w) {
+                    nv21[dst++] = rowBuf[col * yPixelStride]
+                }
+            }
+        }
+    }
 
-    val yuvImage =
-            android.graphics.YuvImage(nv21, android.graphics.ImageFormat.NV21, width, height, null)
+    // --- U/V planes: interleave into NV21 as V,U,V,U... ---
+    // Both U and V planes share rowStride / pixelStride by spec.
+    val uvRowStride = uPlane.rowStride
+    val uvPixelStride = uPlane.pixelStride
+    val chromaH = h / 2
+    val chromaW = w / 2
+    val vLimit = vBuffer.limit()
+    val uLimit = uBuffer.limit()
+
+    for (row in 0 until chromaH) {
+        val rowBase = row * uvRowStride
+        for (col in 0 until chromaW) {
+            val srcPos = rowBase + col * uvPixelStride
+            // Guard against the very last byte on some devices where the plane buffer
+            // may be trimmed before a full trailing pixelStride.
+            nv21[dst++] = if (srcPos < vLimit) vBuffer.get(srcPos) else 0
+            nv21[dst++] = if (srcPos < uLimit) uBuffer.get(srcPos) else 0
+        }
+    }
+
+    val yuvImage = android.graphics.YuvImage(nv21, android.graphics.ImageFormat.NV21, w, h, null)
     val out = java.io.ByteArrayOutputStream()
-    yuvImage.compressToJpeg(android.graphics.Rect(0, 0, width, height), 90, out)
+    yuvImage.compressToJpeg(android.graphics.Rect(0, 0, w, h), 90, out)
     val imageBytes = out.toByteArray()
 
-    val options =
-            android.graphics.BitmapFactory.Options().apply {
-                inMutable = true
-                inSampleSize = 1
-            }
+    val options = android.graphics.BitmapFactory.Options().apply {
+        inMutable = true
+        inSampleSize = 1
+    }
     return android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)
 }
 

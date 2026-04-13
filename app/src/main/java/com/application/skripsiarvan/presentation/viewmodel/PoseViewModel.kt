@@ -306,9 +306,27 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Start benchmark logging */
-    fun startLogging() {
-        benchmarkLogger.startLogging()
+    /**
+     * Start benchmark logging.
+     * sessionLabel opsional untuk identifikasi kombinasi (misal: "MoveNet_XNNPACK_Squat").
+     * Kalau kosong, akan di-auto-generate dari state saat ini.
+     */
+    fun startLogging(sessionLabel: String = "") {
+        val state = _uiState.value
+        val label = sessionLabel.ifBlank {
+            val modelShort = when (state.selectedModel) {
+                ModelType.MOVENET_LIGHTNING -> "MoveNet"
+                ModelType.BLAZEPOSE_LITE -> "BlazePose"
+            }
+            val delegateShort = when (state.selectedDelegate) {
+                DelegateType.CPU_BASELINE -> "Baseline"
+                DelegateType.CPU_XNNPACK -> "XNNPACK"
+                DelegateType.GPU -> "GPU"
+            }
+            val exerciseShort = state.selectedExercise.name
+            "${modelShort}_${delegateShort}_${exerciseShort}"
+        }
+        benchmarkLogger.startLogging(label)
         _uiState.value = _uiState.value.copy(isLogging = true, loggedFrameCount = 0)
     }
 
