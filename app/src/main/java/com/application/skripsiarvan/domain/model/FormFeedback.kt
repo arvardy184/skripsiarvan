@@ -10,13 +10,6 @@ data class FormCheck(
   val score: Int = 100 // 0-100 score for this check
 )
 
-/**
- * Comprehensive form feedback for a single frame or rep. Aggregates multiple FormCheck results into
- * an overall assessment.
- *
- * Used by FormAnalyzer implementations to communicate form quality to the UI layer for real-time
- * visual and textual feedback.
- */
 data class FormFeedback(
   val overallScore: Int = 100, // 0-100 overall form score
   val overallSeverity: FeedbackSeverity = FeedbackSeverity.GOOD,

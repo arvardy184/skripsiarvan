@@ -12,11 +12,8 @@ import com.application.skripsiarvan.data.ml.TFLiteHelper
 import com.application.skripsiarvan.data.profiling.ResourceProfiler
 import com.application.skripsiarvan.domain.detector.PoseDetector
 import com.application.skripsiarvan.domain.exercise.ExerciseDetector
-import com.application.skripsiarvan.domain.exercise.FormAnalyzer
 import com.application.skripsiarvan.domain.exercise.PushUpDetector
-import com.application.skripsiarvan.domain.exercise.PushUpFormAnalyzer
 import com.application.skripsiarvan.domain.exercise.SquatDetector
-import com.application.skripsiarvan.domain.exercise.SquatFormAnalyzer
 import com.application.skripsiarvan.domain.model.BenchmarkMetrics
 import com.application.skripsiarvan.domain.model.DelegateType
 import com.application.skripsiarvan.domain.model.ExerciseState
@@ -104,7 +101,6 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
     private val resourceProfiler = ResourceProfiler(application)
     private val benchmarkLogger = BenchmarkLogger(application)
     private var exerciseDetector: ExerciseDetector? = null
-    private var formAnalyzer: FormAnalyzer? = null
 
     init {
         initializeDetector()
@@ -185,13 +181,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                     ExerciseType.PUSH_UP -> PushUpDetector()
 
                 }
-        formAnalyzer =
-                when (type) {
-                    ExerciseType.NONE -> null
-                    ExerciseType.SQUAT -> SquatFormAnalyzer()
-                    ExerciseType.PUSH_UP -> PushUpFormAnalyzer()
-
-                }
+    
     }
 
     /** Update selected model and reinitialize detector */
@@ -262,10 +252,6 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
             currentAngle = detector.getCurrentAngle() ?: 0.0
         }
 
-        // Form analysis (runs alongside exercise detection)
-        val feedback = formAnalyzer?.analyzeForm(person)
-        val avgScore = formAnalyzer?.getAverageScore()
-
         // Update UI state
         _uiState.value =
                 currentState.copy(
@@ -280,8 +266,8 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                         exerciseState = exerciseState,
                         repetitionCount = repCount,
                         currentAngle = currentAngle,
-                        formFeedback = feedback,
-                        averageFormScore = avgScore,
+                        formFeedback = null,
+                        averageFormScore = null,
                         loggedFrameCount = benchmarkLogger.getLoggedFrameCount(),
                         loggingDurationSeconds = benchmarkLogger.getLoggingDurationSeconds()
                 )
@@ -355,7 +341,6 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
     /** Reset exercise counter */
     fun resetExercise() {
         exerciseDetector?.reset()
-        formAnalyzer?.reset()
         _uiState.value =
                 _uiState.value.copy(
                         repetitionCount = 0,
