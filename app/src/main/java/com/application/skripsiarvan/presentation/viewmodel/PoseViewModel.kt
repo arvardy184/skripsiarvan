@@ -35,6 +35,7 @@ data class PoseUiState(
         // Model & Delegate selection
         val selectedModel: ModelType = ModelType.MOVENET_LIGHTNING,
         val selectedDelegate: DelegateType = DelegateType.CPU_BASELINE,
+        val effectiveDelegate: DelegateType = DelegateType.CPU_BASELINE,
 
         // Pose detection results
         val detectedPerson: Person? = null,
@@ -128,7 +129,8 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                                 delegateType = currentState.selectedDelegate
                         )
 
-                val (interpreter, isGpuCompatible) = tfliteHelper!!.initializeInterpreter()
+                val initResult = tfliteHelper!!.initializeInterpreter()
+                val interpreter = initResult.interpreter
 
                 if (interpreter == null) {
                     _uiState.value =
@@ -154,8 +156,9 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                                 isInitialized = true,
                                 isWarmUpComplete = false,
                                 warmUpFramesRemaining = 5,
+                                effectiveDelegate = initResult.effectiveDelegateType,
                                 errorMessage =
-                                        if (!isGpuCompatible &&
+                                        if (initResult.usedFallback &&
                                                         currentState.selectedDelegate ==
                                                                 DelegateType.GPU
                                         ) {
@@ -196,7 +199,11 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
     fun selectDelegate(delegateType: DelegateType) {
         if (_uiState.value.selectedDelegate != delegateType) {
             _uiState.value =
-                    _uiState.value.copy(selectedDelegate = delegateType, isInitialized = false)
+                    _uiState.value.copy(
+                            selectedDelegate = delegateType,
+                            effectiveDelegate = delegateType,
+                            isInitialized = false
+                    )
             initializeDetector()
         }
     }
@@ -273,11 +280,12 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
         // Log metrics if logging is active and warm-up is complete
-        if (benchmarkLogger.isCurrentlyLogging() && warmUpComplete) {
+        if (benchmarkLogger.isCurrentlyLogging() && !isWarmUpFrame) {
             val metrics =
                     BenchmarkMetrics(
                             modelType = currentState.selectedModel.displayName,
-                            delegateType = currentState.selectedDelegate.displayName,
+                            selectedDelegateType = currentState.selectedDelegate.displayName,
+                            effectiveDelegateType = currentState.effectiveDelegate.displayName,
                             inferenceTimeMs = modelInferenceTime,
                             processingTimeMs = processingTime,
                             fps = fps,
@@ -309,8 +317,17 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                 DelegateType.CPU_XNNPACK -> "XNNPACK"
                 DelegateType.GPU -> "GPU"
             }
+            val effectiveDelegateShort = when (state.effectiveDelegate) {
+                DelegateType.CPU_BASELINE -> "Baseline"
+                DelegateType.CPU_XNNPACK -> "XNNPACK"
+                DelegateType.GPU -> "GPU"
+            }
             val exerciseShort = state.selectedExercise.name
-            "${modelShort}_${delegateShort}_${exerciseShort}"
+            if (state.selectedDelegate == state.effectiveDelegate) {
+                "${modelShort}_${delegateShort}_${exerciseShort}"
+            } else {
+                "${modelShort}_${delegateShort}_AS_${effectiveDelegateShort}_${exerciseShort}"
+            }
         }
         benchmarkLogger.startLogging(label)
         _uiState.value = _uiState.value.copy(isLogging = true, loggedFrameCount = 0)

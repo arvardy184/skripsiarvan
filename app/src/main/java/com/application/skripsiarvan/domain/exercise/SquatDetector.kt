@@ -44,7 +44,7 @@ class SquatDetector : ExerciseDetector {
         private const val ABORT_CONFIRMATION_FRAMES = 3
 
         // Flip ke false saat benchmark resmi. BuildConfig tidak di-generate di project ini.
-        private const val VERBOSE_FRAME_LOG = true
+        private const val VERBOSE_FRAME_LOG = false
     }
 
     private var repetitionCount = 0

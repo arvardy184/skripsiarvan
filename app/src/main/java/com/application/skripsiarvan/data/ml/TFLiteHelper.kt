@@ -9,6 +9,12 @@ import java.nio.channels.FileChannel
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.GpuDelegate
 
+data class TFLiteInitializationResult(
+        val interpreter: Interpreter?,
+        val effectiveDelegateType: DelegateType,
+        val usedFallback: Boolean
+)
+
 /** Helper class for TensorFlow Lite model loading and delegate management */
 class TFLiteHelper(
         private val context: Context,
@@ -23,15 +29,13 @@ class TFLiteHelper(
         private const val NUM_THREADS = 4
     }
 
-    /**
-     * Initialize interpreter with selected delegate
-     * @return Pair of (Interpreter, isGpuCompatible flag)
-     */
-    fun initializeInterpreter(): Pair<Interpreter?, Boolean> {
+    /** Initialize interpreter with selected delegate and report the delegate that actually runs. */
+    fun initializeInterpreter(): TFLiteInitializationResult {
         try {
             val modelBuffer = loadModelFile(modelFileName)
             var options = Interpreter.Options()
-            var isGpuCompatible = false
+            var effectiveDelegateType = delegateType
+            var usedFallback = false
 
             when (delegateType) {
                 DelegateType.CPU_BASELINE -> {
@@ -55,7 +59,6 @@ class TFLiteHelper(
                         gpuDelegate = GpuDelegate()
                         options.addDelegate(gpuDelegate)
 
-                        isGpuCompatible = true
                         Log.d(TAG, "Level 3: Using GPU Delegate (Default)")
                     } catch (e: Throwable) {
                         Log.e(TAG, "Failed to initialize GPU Delegate: ${e.message}", e)
@@ -63,7 +66,8 @@ class TFLiteHelper(
                         options = Interpreter.Options()
                         options.setNumThreads(NUM_THREADS)
                         options.setUseXNNPACK(true)
-                        isGpuCompatible = false
+                        effectiveDelegateType = DelegateType.CPU_XNNPACK
+                        usedFallback = true
                         gpuDelegate = null
                     }
                 }
@@ -73,7 +77,7 @@ class TFLiteHelper(
                 interpreter = Interpreter(modelBuffer, options)
                 Log.d(TAG, "Interpreter initialized successfully")
             } catch (e: Throwable) {
-                if (isGpuCompatible) {
+                if (effectiveDelegateType == DelegateType.GPU) {
                     Log.e(
                             TAG,
                             "Interpreter creation failed with GPU, attempting fallback to CPU",
@@ -82,23 +86,32 @@ class TFLiteHelper(
                     // Clean up GPU delegate
                     gpuDelegate?.close()
                     gpuDelegate = null
-                    isGpuCompatible = false
 
                     // Retry with CPU options
                     val cpuOptions = Interpreter.Options()
                     cpuOptions.setNumThreads(NUM_THREADS)
                     cpuOptions.setUseXNNPACK(true)
                     interpreter = Interpreter(modelBuffer, cpuOptions)
+                    effectiveDelegateType = DelegateType.CPU_XNNPACK
+                    usedFallback = true
                     Log.d(TAG, "Fallback to CPU init successful")
                 } else {
                     throw e
                 }
             }
 
-            return Pair(interpreter, isGpuCompatible)
+            return TFLiteInitializationResult(
+                    interpreter = interpreter,
+                    effectiveDelegateType = effectiveDelegateType,
+                    usedFallback = usedFallback
+            )
         } catch (e: Throwable) {
             Log.e(TAG, "Error initializing interpreter", e)
-            return Pair(null, false)
+            return TFLiteInitializationResult(
+                    interpreter = null,
+                    effectiveDelegateType = delegateType,
+                    usedFallback = false
+            )
         }
     }
 

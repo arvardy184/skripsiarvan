@@ -60,7 +60,7 @@ class PushUpDetector : ExerciseDetector {
         // menelan beberapa push-up real menjadi satu siklus state.
         private const val ABORT_CONFIRMATION_FRAMES = 3
 
-        private const val VERBOSE_FRAME_LOG = true
+        private const val VERBOSE_FRAME_LOG = false
     }
 
     private var repetitionCount = 0
