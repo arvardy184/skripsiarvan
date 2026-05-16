@@ -13,6 +13,7 @@ package com.application.skripsiarvan.domain.exercise
 
 import android.util.Log
 import com.application.skripsiarvan.domain.model.ExerciseState
+import com.application.skripsiarvan.domain.model.BodyPart
 import com.application.skripsiarvan.domain.model.Person
 import java.util.ArrayDeque
 
@@ -49,7 +50,10 @@ class PushUpDetector : ExerciseDetector {
         private const val ANGLE_DOWN_ENTER = 115.0
         private const val ANGLE_DOWN_EXIT = 125.0 // Hysteresis 10° dari ENTER
 
-        private const val SMOOTHING_WINDOW_SIZE = 3
+        // BlazePose ~1 fps saat push-up: window 3 berarti rata-rata nilai dari rentang 5-10 detik,
+        // satu frame angle rendah tenggelam oleh 2 nilai lama → transisi tidak terpicu.
+        // Window=1 tidak ada smoothing di sini; BlazePoseDetector sudah apply EMA α=0.4.
+        private const val SMOOTHING_WINDOW_SIZE = 1
 
         // Temporal constraints (ms)
         private const val MIN_DOWN_HOLD_MS = 150L
@@ -58,7 +62,11 @@ class PushUpDetector : ExerciseDetector {
         // DOWN ↔ GOING_UP / UP ↔ GOING_DOWN akibat satu frame noisy yang menyeberang
         // threshold. Dari log terlihat pola "DOWN→GOING_UP→DOWN→GOING_UP→..." yang
         // menelan beberapa push-up real menjadi satu siklus state.
-        private const val ABORT_CONFIRMATION_FRAMES = 3
+        // Dengan ~1 fps di BlazePose, 3 frame = 3 detik menunggu. Turunkan ke 1.
+        private const val ABORT_CONFIRMATION_FRAMES = 1
+        private const val MIN_PUSHUP_KEYPOINT_SCORE = 0.2f
+        private const val MIN_BODY_HORIZONTAL_EXTENT = 0.12f
+        private const val INVALID_POSE_RESET_FRAMES = 5
 
         private const val VERBOSE_FRAME_LOG = false
     }
@@ -76,6 +84,12 @@ class PushUpDetector : ExerciseDetector {
     // Hysteresis counters untuk menolak transisi dari 1 frame noisy
     private var consecutiveAboveUpCount = 0
     private var consecutiveBelowDownCount = 0
+    private var consecutiveInvalidPoseCount = 0
+
+    // Anti-overcount: cooldown + full-cycle guard
+    private var lastRepTimeMs = 0L
+    private val REP_COOLDOWN_MS = 500L
+    private var hasReachedBottom = false
 
     private enum class PushUpState {
         UP, // > 160° (Plank)
@@ -84,10 +98,28 @@ class PushUpDetector : ExerciseDetector {
         GOING_UP // 105° -> 160° (Concentric phase)
     }
 
+    private var diagFrameCount = 0
+
     override fun analyzeFrame(person: Person?): ExerciseState {
-        if (person == null) return ExerciseState.IDLE
+        diagFrameCount++
+        if (person == null) {
+            if (diagFrameCount % 15 == 0)
+                Log.d("PushUpDebug", "SKIP person=null state=$currentState")
+            return ExerciseState.IDLE
+        }
+        if (!isPushUpPoseOrientation(person)) {
+            val ls = person.keypoints.getOrNull(BodyPart.LEFT_SHOULDER)
+            val lh = person.keypoints.getOrNull(BodyPart.LEFT_HIP)
+            if (diagFrameCount % 15 == 0)
+                Log.d("PushUpDebug", "SKIP orientation_fail sh=(${ls?.x?.let{"%.2f".format(it)}},${ls?.y?.let{"%.2f".format(it)}}) sco=${ls?.score?.let{"%.2f".format(it)}} hip=(${lh?.x?.let{"%.2f".format(it)}},${lh?.y?.let{"%.2f".format(it)}}) sco=${lh?.score?.let{"%.2f".format(it)}}")
+            handleInvalidPose()
+            return ExerciseState.IDLE
+        }
+        consecutiveInvalidPoseCount = 0
 
         val rawAngle = AngleCalculator.getAverageElbowAngle(person) ?: return ExerciseState.IDLE
+
+        Log.d("PushUpDebug", "angle=$rawAngle state=$currentState wristL=${person.keypoints.getOrNull(9)?.score} wristR=${person.keypoints.getOrNull(10)?.score}")
 
         // 1. Signal Smoothing
         val smoothedAngle = applySmoothing(rawAngle)
@@ -131,6 +163,7 @@ class PushUpDetector : ExerciseDetector {
                 }
             }
             PushUpState.DOWN -> {
+                hasReachedBottom = true
                 val durationAtBottom = currentTime - stateStartTime
 
                 // Cek apakah mulai naik
@@ -157,8 +190,15 @@ class PushUpDetector : ExerciseDetector {
                 if (smoothedAngle >= ANGLE_UP_ENTER) {
                     consecutiveBelowDownCount = 0
                     transitionTo(PushUpState.UP, currentTime)
-                    repetitionCount++
-                    Log.d(TAG, "✅ REP COMPLETED! Total: $repetitionCount (Elbow: ${"%.1f".format(smoothedAngle)}°)")
+                    val cooldownOk = (currentTime - lastRepTimeMs) >= REP_COOLDOWN_MS
+                    if (hasReachedBottom && cooldownOk) {
+                        repetitionCount++
+                        lastRepTimeMs = currentTime
+                        Log.d(TAG, "✅ REP COMPLETED! Total: $repetitionCount (Elbow: ${"%.1f".format(smoothedAngle)}°)")
+                    } else {
+                        Log.w(TAG, "⚠️ Rep ditolak: hasReachedBottom=$hasReachedBottom cooldownOk=$cooldownOk")
+                    }
+                    hasReachedBottom = false
                     exerciseState = ExerciseState.COMPLETED
                 } else if (smoothedAngle < ANGLE_DOWN_ENTER) {
                     // Kandidat turun lagi — butuh N frame sebelum commit kembali ke DOWN.
@@ -213,5 +253,47 @@ class PushUpDetector : ExerciseDetector {
         stateStartTime = 0L
         consecutiveAboveUpCount = 0
         consecutiveBelowDownCount = 0
+        consecutiveInvalidPoseCount = 0
+        lastRepTimeMs = 0L
+        hasReachedBottom = false
+    }
+
+    private fun isPushUpPoseOrientation(person: Person): Boolean {
+        val leftShoulder = person.keypoints.getOrNull(BodyPart.LEFT_SHOULDER)
+        val rightShoulder = person.keypoints.getOrNull(BodyPart.RIGHT_SHOULDER)
+        val leftHip = person.keypoints.getOrNull(BodyPart.LEFT_HIP)
+        val rightHip = person.keypoints.getOrNull(BodyPart.RIGHT_HIP)
+
+        val shoulder = listOfNotNull(leftShoulder, rightShoulder).maxByOrNull { it.score }
+        val hip = listOfNotNull(leftHip, rightHip).maxByOrNull { it.score }
+        if (shoulder == null || hip == null) return false
+        if (
+                shoulder.score < MIN_PUSHUP_KEYPOINT_SCORE ||
+                        hip.score < MIN_PUSHUP_KEYPOINT_SCORE
+        ) return false
+
+        val torsoDx = kotlin.math.abs(shoulder.x - hip.x)
+        val torsoDy = kotlin.math.abs(shoulder.y - hip.y)
+
+        // Kondisi 1 (side-view): shoulder dan hip terpisah secara horizontal — badan mendatar.
+        val isSideHorizontal = torsoDx > torsoDy && torsoDx >= MIN_BODY_HORIZONTAL_EXTENT
+
+        // Kondisi 2 (BlazePose front-view): model collapse shoulder/hip ke x serupa,
+        // tapi ketinggian y keduanya hampir sama → badan tetap horizontal.
+        // Berdiri/squat: torsoDy ≥ 0.25 (bahu jauh lebih tinggi dari pinggul).
+        val isFlatByY = torsoDy < 0.20f
+
+        return isSideHorizontal || isFlatByY
+    }
+
+    private fun handleInvalidPose() {
+        consecutiveInvalidPoseCount++
+        if (consecutiveInvalidPoseCount >= INVALID_POSE_RESET_FRAMES) {
+            currentState = PushUpState.UP
+            angleBuffer.clear()
+            lastSmoothedAngle = null
+            consecutiveAboveUpCount = 0
+            consecutiveBelowDownCount = 0
+        }
     }
 }

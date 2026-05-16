@@ -1,6 +1,7 @@
 package com.application.skripsiarvan.presentation.camera
 
 import android.util.Log
+import android.os.Process
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -46,6 +47,9 @@ import com.application.skripsiarvan.presentation.viewmodel.PoseUiState
 import com.application.skripsiarvan.presentation.viewmodel.PoseViewModel
 import java.util.concurrent.Executors
 
+private val PREVIEW_TARGET_RESOLUTION = android.util.Size(640, 480)
+private val ANALYSIS_TARGET_RESOLUTION = android.util.Size(256, 192)
+
 /** Main camera screen with pose detection and benchmarking controls */
 @Composable
 fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
@@ -54,7 +58,18 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
         val uiState by viewModel.uiState.collectAsState()
 
         var previewView by remember { mutableStateOf<PreviewView?>(null) }
-        val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+        val cameraExecutor =
+                remember {
+                        Executors.newSingleThreadExecutor { runnable ->
+                                Thread {
+                                                Process.setThreadPriority(
+                                                        Process.THREAD_PRIORITY_DISPLAY
+                                                )
+                                                runnable.run()
+                                        }
+                                        .apply { name = "PoseAnalyzer" }
+                        }
+                }
 
         // Menampilkan nama + skor tiap keypoint langsung di overlay
         var debugMode by remember { mutableStateOf(false) }
@@ -78,13 +93,19 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                         val cameraProvider = ProcessCameraProvider.getInstance(context).get()
 
                         val preview =
-                                Preview.Builder().build().also {
+                                Preview.Builder()
+                                        .setTargetResolution(PREVIEW_TARGET_RESOLUTION)
+                                        .build()
+                                        .also {
                                         it.setSurfaceProvider(currentPreviewView.surfaceProvider)
                                 }
 
                         val imageAnalysis =
                                 ImageAnalysis.Builder()
-                                        .setTargetResolution(android.util.Size(640, 480))
+                                        .setTargetResolution(ANALYSIS_TARGET_RESOLUTION)
+                                        .setOutputImageFormat(
+                                                ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
+                                        )
                                         .setBackpressureStrategy(
                                                 ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
                                         )
@@ -104,7 +125,13 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                                                 cpuUsage,
                                                 memoryUsage,
                                                 powerConsumption,
-                                                isWarmUpFrame ->
+                                                cameraFrameAspectRatio,
+                                                isWarmUpFrame,
+                                                convertMs,
+                                                preprocessMs,
+                                                postprocessMs,
+                                                avgKeypointConfidence,
+                                                validKeypointCount ->
                                                 viewModel.updateResults(
                                                         person,
                                                         processingTime,
@@ -113,7 +140,13 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                                                         cpuUsage,
                                                         memoryUsage,
                                                         powerConsumption,
-                                                        isWarmUpFrame
+                                                        cameraFrameAspectRatio,
+                                                        isWarmUpFrame,
+                                                        convertMs,
+                                                        preprocessMs,
+                                                        postprocessMs,
+                                                        avgKeypointConfidence,
+                                                        validKeypointCount
                                                 )
                                         }
                                 )
@@ -163,6 +196,7 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                         person = uiState.detectedPerson,
                         viewWidth = previewView?.width?.toFloat() ?: 1080f,
                         viewHeight = previewView?.height?.toFloat() ?: 1920f,
+                        sourceAspectRatio = uiState.cameraFrameAspectRatio,
                         formFeedback = uiState.formFeedback,
                         debugMode = debugMode
                 )
@@ -211,6 +245,8 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                         onStopLogging = viewModel::stopLogging,
                         onExportCsv = viewModel::exportToCsv,
                         onResetExercise = viewModel::resetExercise,
+                        onSetExperimentMetadata = viewModel::setExperimentMetadata,
+                        onExportSummary = viewModel::exportSessionSummaryCsv,
                         modifier = Modifier.align(Alignment.BottomCenter)
                 )
 
@@ -267,6 +303,8 @@ fun ControlPanel(
         onStopLogging: () -> Unit,
         onExportCsv: () -> Unit,
         onResetExercise: () -> Unit,
+        onSetExperimentMetadata: (Int, Int, String) -> Unit,
+        onExportSummary: () -> Unit,
         modifier: Modifier = Modifier
 ) {
         Card(
@@ -411,9 +449,14 @@ fun ControlPanel(
                                                 isLogging = uiState.isLogging,
                                                 loggedFrameCount = uiState.loggedFrameCount,
                                                 loggingDuration = uiState.loggingDurationSeconds,
+                                                replicationId = uiState.replicationId,
+                                                groundTruthReps = uiState.groundTruthReps,
+                                                experimentVersion = uiState.experimentVersion,
                                                 onStartLogging = onStartLogging,
                                                 onStopLogging = onStopLogging,
-                                                onExportCsv = onExportCsv
+                                                onExportCsv = onExportCsv,
+                                                onSetExperimentMetadata = onSetExperimentMetadata,
+                                                onExportSummary = onExportSummary
                                         )
 
                                         HorizontalDivider(color = Color.Gray)
@@ -679,16 +722,25 @@ fun ExerciseDisplay(
         }
 }
 
-/** Logging controls */
+/** Logging controls with experiment metadata input */
 @Composable
 fun LoggingControls(
         isLogging: Boolean,
         loggedFrameCount: Int,
         loggingDuration: Long,
+        replicationId: Int,
+        groundTruthReps: Int,
+        experimentVersion: String,
         onStartLogging: () -> Unit,
         onStopLogging: () -> Unit,
-        onExportCsv: () -> Unit
+        onExportCsv: () -> Unit,
+        onSetExperimentMetadata: (Int, Int, String) -> Unit,
+        onExportSummary: () -> Unit
 ) {
+        var replicationIdText by remember(replicationId) { mutableStateOf(replicationId.toString()) }
+        var groundTruthRepsText by remember(groundTruthReps) { mutableStateOf(groundTruthReps.toString()) }
+        var expVersionText by remember(experimentVersion) { mutableStateOf(experimentVersion) }
+
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                         text = "Benchmark Logging",
@@ -696,6 +748,84 @@ fun LoggingControls(
                         color = Color.Gray
                 )
 
+                // ── Metadata eksperimen ──────────────────────────────────────
+                Text(
+                        text = "Metadata Eksperimen",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFAAAAAA)
+                )
+                Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                        OutlinedTextField(
+                                value = replicationIdText,
+                                onValueChange = { v ->
+                                        replicationIdText = v
+                                        val n = v.toIntOrNull() ?: return@OutlinedTextField
+                                        onSetExperimentMetadata(n, groundTruthReps, expVersionText)
+                                },
+                                label = { Text("Rep ID", style = MaterialTheme.typography.labelSmall) },
+                                singleLine = true,
+                                enabled = !isLogging,
+                                modifier = Modifier.weight(1f),
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.LightGray,
+                                        disabledTextColor = Color.Gray,
+                                        focusedBorderColor = Color(0xFF4CAF50),
+                                        unfocusedBorderColor = Color.Gray,
+                                        focusedLabelColor = Color(0xFF4CAF50),
+                                        unfocusedLabelColor = Color.Gray
+                                )
+                        )
+                        OutlinedTextField(
+                                value = groundTruthRepsText,
+                                onValueChange = { v ->
+                                        groundTruthRepsText = v
+                                        val n = v.toIntOrNull() ?: return@OutlinedTextField
+                                        onSetExperimentMetadata(replicationId, n, expVersionText)
+                                },
+                                label = { Text("GT Reps", style = MaterialTheme.typography.labelSmall) },
+                                singleLine = true,
+                                enabled = !isLogging,
+                                modifier = Modifier.weight(1f),
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.LightGray,
+                                        disabledTextColor = Color.Gray,
+                                        focusedBorderColor = Color(0xFF4CAF50),
+                                        unfocusedBorderColor = Color.Gray,
+                                        focusedLabelColor = Color(0xFF4CAF50),
+                                        unfocusedLabelColor = Color.Gray
+                                )
+                        )
+                        OutlinedTextField(
+                                value = expVersionText,
+                                onValueChange = { v ->
+                                        expVersionText = v
+                                        onSetExperimentMetadata(replicationId, groundTruthReps, v)
+                                },
+                                label = { Text("Version", style = MaterialTheme.typography.labelSmall) },
+                                singleLine = true,
+                                enabled = !isLogging,
+                                modifier = Modifier.weight(1.4f),
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.LightGray,
+                                        disabledTextColor = Color.Gray,
+                                        focusedBorderColor = Color(0xFF4CAF50),
+                                        unfocusedBorderColor = Color.Gray,
+                                        focusedLabelColor = Color(0xFF4CAF50),
+                                        unfocusedLabelColor = Color.Gray
+                                )
+                        )
+                }
+
+                // ── Record / Stop ────────────────────────────────────────────
                 Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -703,34 +833,20 @@ fun LoggingControls(
                         if (isLogging) {
                                 Button(
                                         onClick = onStopLogging,
-                                        colors =
-                                                ButtonDefaults.buttonColors(
-                                                        containerColor = Color(0xFFE53935)
-                                                ),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935)),
                                         modifier = Modifier.weight(1f)
                                 ) {
-                                        Icon(
-                                                Icons.Default.Stop,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
-                                        )
+                                        Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(4.dp))
                                         Text("Stop", style = MaterialTheme.typography.bodySmall)
                                 }
                         } else {
                                 Button(
                                         onClick = onStartLogging,
-                                        colors =
-                                                ButtonDefaults.buttonColors(
-                                                        containerColor = Color(0xFF4CAF50)
-                                                ),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                                         modifier = Modifier.weight(1f)
                                 ) {
-                                        Icon(
-                                                Icons.Default.PlayArrow,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
-                                        )
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(4.dp))
                                         Text("Record", style = MaterialTheme.typography.bodySmall)
                                 }
@@ -739,25 +855,30 @@ fun LoggingControls(
                         Button(
                                 onClick = onExportCsv,
                                 enabled = loggedFrameCount > 0,
-                                colors =
-                                        ButtonDefaults.buttonColors(
-                                                containerColor = Color(0xFF1976D2)
-                                        ),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
                                 modifier = Modifier.weight(1f)
                         ) {
-                                Icon(
-                                        Icons.Default.Save,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text("Export CSV", style = MaterialTheme.typography.bodySmall)
                         }
                 }
 
+                // ── Export Summary (session-level, siap ANOVA) ───────────────
+                Button(
+                        onClick = onExportSummary,
+                        enabled = loggedFrameCount > 0 && !isLogging,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B1FA2)),
+                        modifier = Modifier.fillMaxWidth()
+                ) {
+                        Icon(Icons.Default.Assessment, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Export Summary (ANOVA)", style = MaterialTheme.typography.bodySmall)
+                }
+
                 if (loggedFrameCount > 0 || isLogging) {
                         Text(
-                                text = "Frames: $loggedFrameCount | Duration: ${loggingDuration}s",
+                                text = "Frames: $loggedFrameCount | Duration: ${loggingDuration}s | RepID: $replicationId | GT: $groundTruthReps",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (isLogging) Color(0xFF4CAF50) else Color.LightGray
                         )

@@ -158,6 +158,107 @@ class BenchmarkLogger(private val context: Context) {
         return file.absolutePath
     }
 
+    /**
+     * Export session summary CSV — satu baris per sesi, siap untuk ANOVA.
+     * Hanya menghitung frame non-warmup (is_warmup = false).
+     */
+    fun exportSessionSummaryCsv(): String? {
+        val allMetrics = metricsQueue.toList()
+        val metrics = allMetrics.filter { !it.isWarmup }
+        if (metrics.isEmpty()) {
+            Log.w(TAG, "No non-warmup data for session summary")
+            return null
+        }
+
+        val latencies = metrics.map { it.inferenceTimeMs.toDouble() }
+        val sortedLatencies = latencies.sorted()
+        val avgLatency = latencies.average()
+        val p95Index = ((sortedLatencies.size - 1) * 0.95).toInt()
+        val p95Latency = sortedLatencies[p95Index]
+        val medianLatency = sortedLatencies[sortedLatencies.size / 2]
+
+        val pipelines = metrics.map { it.processingTimeMs.toDouble() }
+
+        val groundTruth = metrics.firstOrNull()?.groundTruthReps ?: 0
+        val finalRepCount = metrics.maxOfOrNull { it.repetitionCount } ?: 0
+        val repError = finalRepCount - groundTruth
+        val repAccuracy = if (groundTruth > 0)
+            minOf(finalRepCount, groundTruth).toDouble() / groundTruth * 100.0
+        else 0.0
+
+        val detectedCount = metrics.count { it.poseDetected }
+        val validFrameRatio = detectedCount.toFloat() / metrics.size
+
+        val first = metrics.first()
+        val summaryLine = "${first.deviceName},${first.replicationId}," +
+            "${first.modelType},${first.effectiveDelegateType},${first.exerciseType}," +
+            "$groundTruth,$finalRepCount,$repError,${"%.1f".format(repAccuracy)}," +
+            "${"%.3f".format(avgLatency)},${"%.3f".format(medianLatency)},${"%.3f".format(p95Latency)}," +
+            "${"%.3f".format(pipelines.average())}," +
+            "${"%.2f".format(metrics.map { it.fps.toDouble() }.average())}," +
+            "${"%.2f".format(metrics.map { it.cpuUsagePercent.toDouble() }.average())}," +
+            "${"%.2f".format(metrics.map { it.memoryUsageMb.toDouble() }.average())}," +
+            "${"%.4f".format(validFrameRatio)},${metrics.size}," +
+            "${getLoggingDurationSeconds() * 1000}," +
+            "${first.experimentVersion},${first.sessionLabel}"
+
+        val summaryHeader = "device_name,replication_id,model_type,delegate_type,exercise_type," +
+            "ground_truth_reps,final_rep_count,rep_error,rep_accuracy_pct," +
+            "mean_inference_ms,median_inference_ms,p95_inference_ms," +
+            "mean_pipeline_ms,mean_fps,mean_cpu,mean_memory_mb," +
+            "valid_frame_ratio,frame_count,duration_ms," +
+            "experiment_version,session_label"
+
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val fileName = "${FILE_PREFIX}summary_$timestamp$FILE_EXTENSION"
+
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                writeSummaryWithMediaStore(fileName, summaryHeader, summaryLine)
+            } else {
+                writeSummaryToDownloads(fileName, summaryHeader, summaryLine)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error exporting session summary CSV", e)
+            null
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun writeSummaryWithMediaStore(fileName: String, header: String, line: String): String? {
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, "text/csv")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues) ?: return null
+        resolver.openOutputStream(uri)?.use { os ->
+            OutputStreamWriter(os).use { w ->
+                w.write(header); w.write("\n")
+                w.write(line); w.write("\n")
+            }
+        }
+        contentValues.clear()
+        contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
+        resolver.update(uri, contentValues, null, null)
+        Log.d(TAG, "Session summary exported to $fileName")
+        return uri.toString()
+    }
+
+    private fun writeSummaryToDownloads(fileName: String, header: String, line: String): String? {
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val file = File(dir, fileName)
+        FileOutputStream(file).use { fos ->
+            OutputStreamWriter(fos).use { w ->
+                w.write(header); w.write("\n")
+                w.write(line); w.write("\n")
+            }
+        }
+        Log.d(TAG, "Session summary exported to ${file.absolutePath}")
+        return file.absolutePath
+    }
+
     fun clearLog() {
         metricsQueue.clear()
         frameCounter.set(0)
