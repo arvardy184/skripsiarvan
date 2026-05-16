@@ -13,6 +13,7 @@
 package com.application.skripsiarvan.domain.exercise
 
 import android.util.Log
+import com.application.skripsiarvan.domain.model.BodyPart
 import com.application.skripsiarvan.domain.model.ExerciseState
 import com.application.skripsiarvan.domain.model.Person
 import java.util.ArrayDeque
@@ -49,6 +50,7 @@ class SquatDetector : ExerciseDetector {
 
     private var repetitionCount = 0
     private var currentState = SquatState.STANDING
+    private var diagFrameCount = 0
 
     // Smoothing buffer
     private val angleBuffer = ArrayDeque<Double>(SMOOTHING_WINDOW_SIZE)
@@ -69,9 +71,33 @@ class SquatDetector : ExerciseDetector {
     }
 
     override fun analyzeFrame(person: Person?): ExerciseState {
-        if (person == null) return ExerciseState.IDLE
+        diagFrameCount++
 
-        val rawAngle = AngleCalculator.getAverageKneeAngle(person) ?: return ExerciseState.IDLE
+        if (person == null) {
+            if (diagFrameCount % 15 == 0)
+                Log.d("SquatDebug", "SKIP person=null state=$currentState")
+            return ExerciseState.IDLE
+        }
+
+        // Log skor keypoint lutut saat angle null — menunjukkan apakah masalahnya skor rendah
+        val lHip   = person.keypoints.getOrNull(BodyPart.LEFT_HIP)
+        val lKnee  = person.keypoints.getOrNull(BodyPart.LEFT_KNEE)
+        val lAnkle = person.keypoints.getOrNull(BodyPart.LEFT_ANKLE)
+        val rHip   = person.keypoints.getOrNull(BodyPart.RIGHT_HIP)
+        val rKnee  = person.keypoints.getOrNull(BodyPart.RIGHT_KNEE)
+        val rAnkle = person.keypoints.getOrNull(BodyPart.RIGHT_ANKLE)
+
+        val rawAngle = AngleCalculator.getAverageKneeAngle(person)
+        if (rawAngle == null) {
+            if (diagFrameCount % 15 == 0)
+                Log.d("SquatDebug", "SKIP angle=null state=$currentState | " +
+                    "Lhip=${lHip?.score?.let{"%.2f".format(it)}} Lkn=${lKnee?.score?.let{"%.2f".format(it)}} Lank=${lAnkle?.score?.let{"%.2f".format(it)}} | " +
+                    "Rhip=${rHip?.score?.let{"%.2f".format(it)}} Rkn=${rKnee?.score?.let{"%.2f".format(it)}} Rank=${rAnkle?.score?.let{"%.2f".format(it)}}")
+            return ExerciseState.IDLE
+        }
+
+        Log.d("SquatDebug", "angle=$rawAngle state=$currentState | " +
+            "Lkn=${lKnee?.score?.let{"%.2f".format(it)}} Rkn=${rKnee?.score?.let{"%.2f".format(it)}}")
 
         val smoothedAngle = applySmoothing(rawAngle)
         val currentTime = System.currentTimeMillis()

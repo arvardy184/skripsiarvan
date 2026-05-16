@@ -1,5 +1,4 @@
-﻿ ANALISIS KINERJA AKSELERASI PERANGKAT KERAS UNTUK INFERENSI POSE ESTIMATION REAL-TIME PADA APLIKASI KEBUGARAN ANDROID
-
+﻿ANALISIS KINERJA AKSELERASI PERANGKAT KERAS UNTUK INFERENSI POSE ESTIMATION REAL-TIME PADA APLIKASI KEBUGARAN ANDROID
 SKRIPSI
 Untuk memenuhi sebagian persyaratan 
 memperoleh gelar Sarjana Komputer
@@ -10,14 +9,14 @@ NIM: 225150200111014
 
 
 
-   PROGRAM STUDI TEKNIK INFORMATIKA
+PROGRAM STUDI TEKNIK INFORMATIKA
 JURUSAN TEKNIK INFORMATIKA
 FAKULTAS ILMU KOMPUTER
 UNIVERSITAS BRAWIJAYA
 MALANG
 2026
 PENGESAHAN
-JUDUL SKRIPSI 
+ANALISIS KINERJA PERANGKAT KERAS UNTUK INFERENSI POSE ESTIMATION REAL-TIME PADA APLIKASI KEBUGARAN ANDROID
 
 SKRIPSI 
 
@@ -25,11 +24,11 @@ Diajukan untuk memenuhi sebagian persyaratan
 memperoleh gelar Sarjana Komputer 
 
 Disusun Oleh : 
-Nama Mahasiswa
-NIM: 123456789
+Arvan Yudhistia Ardana
+NIM: 225150200111014
 
 Skripsi ini telah diuji dan dinyatakan lulus pada
-2 Januari 2015
+2 Mei 2026
 Telah diperiksa dan disetujui oleh:
 
 
@@ -41,8 +40,7 @@ Dosen Pembimbing I
 
 Nama Dosen Pembimbing 1
 NIK: 123456789 
-/*jika terdapat NIK saja*/ 
-Dosen Pembimbing 2
+/*jika terdapat NIK saja*/ 	Dosen Pembimbing 2
 
 
 
@@ -67,17 +65,17 @@ PERNYATAAN ORISINALITAS
 Saya menyatakan dengan sebenar-benarnya bahwa sepanjang pengetahuan saya, di  dalam naskah skripsi ini tidak terdapat karya ilmiah yang pernah diajukan oleh orang lain untuk memperoleh gelar akademik di suatu perguruan  tinggi, dan tidak terdapat karya atau pendapat yang pernah ditulis atau diterbitkan oleh orang lain, kecuali yang secara tertulis disitasi dalam naskah ini dan disebutkan dalam daftar referensi. 
 Apabila ternyata didalam naskah skripsi ini dapat dibuktikan terdapat unsur-unsur plagiasi, saya bersedia skripsi ini digugurkan dan gelar akademik yang telah saya peroleh (sarjana) dibatalkan, serta diproses sesuai dengan peraturan perundang-undangan yang berlaku (UU No. 20 Tahun 2003, Pasal 25 ayat 2 dan Pasal 70). 
 
-Malang, 1 Januari 2015
+Malang, 1 Mei 2026
  
 
     
 ¬ 
-Nama Mahasiswa
-NIM: 123456789
+Arvan Yudhistia Ardana
+NIM: 225150200111014
 PRAKATA
 Bagian ini memuat pernyataan resmi untuk menyampaikan rasa terima kasih penulis kepada berbagai pihak yang telah membantu penyelesaian skripsi ini. Nama-nama penerima ucapan terima kasih sebaiknya dituliskan lengkap, termasuk gelar akademik, dan pihak-pihak yang tidak terkait dihindari untuk dituliskan. Bahasa yang digunakan seharusnya mengikuti kaidah bahasa Indonesia yang baku. Prakata boleh diakhiri dengan paragraf yang menyatakan bahwa penulis menerima kritik dan saran untuk pengembangan penelitian selanjutnya. Terakhir, prakata ditutup dengan mencantumkan kota dan tanggal penulisan prakata, lalu diikuti dengan kata “Penulis”.
 
-Malang, 1 Januari 2026
+Malang, 2 Mei 2026
 
 Penulis
 email@domain.com
@@ -94,592 +92,993 @@ Student Name, Skripsi Title
 Supervisors: First Supervisor’s Name and Second Supervisor’s Name
 The absract of your skripsi in English is written here. 
 DAFTAR ISI
-Table of Contents
-ANALISIS KINERJA AKSELERASI PERANGKAT KERAS UNTUK INFERENSI POSE ESTIMATION REAL-TIME PADA APLIKASI KEBUGARAN ANDROID	i
 PENGESAHAN	ii
 PERNYATAAN ORISINALITAS	iii
 PRAKATA	iv
 ABSTRAK	v
 ABSTRACT	vi
 DAFTAR ISI	vii
-DAFTAR TABEL	viii
-DAFTAR GAMBAR	ix
-DAFTAR LAMPIRAN	x
+DAFTAR TABEL	xi
+DAFTAR GAMBAR	xii
+DAFTAR LAMPIRAN	xiii
 BAB 1 PENDAHULUAN	1
 1.1 Latar Belakang	1
-1.2 Rumusan Masalah	2
-1.3 Tujuan	3
-1.4 Manfaat	3
-1.5 Batasan Masalah	4
-1.6 Sistematika Pembahasan	5
-BAB 2 LANDASAN KEPUSTAKAAN	6
-2.1 Kajian Pustaka	6
-2.1.1 Gap Penelitian	8
-2.2 Landasan Teori	9
-2.2.1 Pose Estimation	9
-2.2.2 Tensorflow Lite	9
-2.2.3 Model MoveNet	10
-2.2.4 Model BlazePose Lite	11
-2.2.5 Pengembangan Aplikasi Bergerak Android	12
-2.2.6 Metrik Kinerja Aplikasi Bergerak	12
-2.2.7 Analisis Varians (ANOVA)	14
-BAB 3 METODOLOGI	16
-3.1 Jenis Penelitian	16
-3.2 Desain Eksperimen	16
-3.3 Tahapan Penelitian	17
-3.4 Metodologi Pengujian dan Analisis Statistik	19
-3.5 Variabel Penelitian	20
-3.6 Metode Eksperimen	21
-3.7 Statistik yang Digunakan	22
-BAB 4 PERANCANGAN SISTEM	23
-4.1 Analisis Kebutuhan Sistem	23
-4.1.1 Kebutuhan Fungsional	23
-4.1.2 Kebutuhan Non-Fungsional	24
-4.2 Perancangan Arsitektur Sistem	24
-4.2.1 Diagram Arsitektur (3-Layer Architecture)	24
-4.2.2 Diagram Alir Data (Data Flow) Diagram berikut menjelaskan aliran data citra dari kamera hingga menjadi data metrik.	25
-4.2.3 Diagram Sekuens	25
-4.3 Perancangan Algoritma (Flowchart)	25
-4.3.1 Flowchart Alur Inferensi. Proses inferensi dirancang untuk mengukur latensi secara presisi menggunakan penanda waktu (timestamp).	26
-4.3.2 Flowchart Penghitungan Repetisi Logika penghitungan repetisi menggunakan state machine sederhana berdasarkan sudut sendi untuk gerakan Squat dan Push-up.	26
-4.3.3 Pseudocode Pengukuran Latensi. Pengukuran latensi dilakukan pada level kode menggunakan fungsi waktu sistem beresolusi tinggi.	26
-4.3.4 Mekanisme Error Handling & Fallback	27
-4.4 Perancangan Antarmuka Pengguna (UI Design)	27
-4.4.1 Perancangan Antarmuka (UI)	27
-4.5 Perancangan Sistem Pengukuran Metrik	29
-4.5.1 Strategi Pengukuran Latensi	29
-BAB 5 PENGEMBANGAN APLIKASI	32
-7.1 Implementasi Sistem	33
-7.2 Hasil Pengujian	33
-7.3 Pembahasan	33
-7.4 Analisis Performa Delegate (Menjawab Rumusan Masalah 1)	33
-7.5 Analisis Perbandingan Model (Menjawab Rumusan Masalah 2)	33
-7.6 Analisis Keseimbangan (Trade-off) (Menjawab Rumusan Masalah 3)	33
-7.6.1 Subbab Lima Satu Satu	33
-7.6.2 Subbab Lima Satu Dua	34
-7.7 Subbab Lima Dua	34
-7.7.1 Subbab Lima Dua Satu	34
-7.7.2 Subbab Lima Dua Dua	34
-7.8 Subbab Lima Tiga	35
-7.8.1 Contoh Struktur Penelitian Implementatif Pembangunan	35
-7.8.2 Contoh Struktur Penelitian Nonimplementatif Eksperimental	36
-BAB 8 Penutup	37
-8.1 Kesimpulan	37
-8.2 Saran	37
-DAFTAR REFERENSI	38
-LAMPIRAN A PERSYARATAN FISIK DAN TATA LETAK	41
-A.1 Kertas	41
-A.2 Margin	41
-A.3 Jenis dan Ukuran Huruf	41
-A.4 Spasi	41
-A.5 Kepala Bab dan Subbab	41
-A.6 Nomor Halaman	42
-
-
+1.2 Rumusan Masalah	3
+1.3 Hipotesis	3
+1.4 Tujuan	4
+1.5 Manfaat	4
+1.6 Batasan Masalah	5
+1.7 Sistematika Pembahasan	6
+BAB 2 LANDASAN KEPUSTAKAAN	7
+2.1 Kajian Pustaka	7
+2.1.1 Gap Penelitian	10
+2.2 Landasan Teori	10
+2.2.1 Pose Estimation	10
+2.2.2 Biomekanik Gerakan Squat dan Push-up	11
+2.2.3 TensorFlow Lite	12
+2.2.4 Sistem Delegate TensorFlow Lite	13
+2.2.5 Model MoveNet	14
+2.2.6 Model BlazePose Lite	14
+2.2.7 Thermal Throttling pada Inferensi Mobile	15
+2.2.8 Pengembangan Aplikasi Bergerak Android	15
+2.2.9 Metrik Kinerja Aplikasi Bergerak	16
+2.2.10 Analisis Varians (ANOVA)	17
+BAB 3 METODOLOGI PENELITIAN	19
+3.1 Jenis Penelitian	19
+3.2 Desain Eksperimen	19
+3.3 Variabel Penelitian	20
+3.3.1 Variabel Bebas	20
+3.3.2 Variabel Terikat	20
+3.3.3 Variabel Kontrol	21
+3.4 Tahap Persiapan	23
+3.4.1 Tahap Pengembangan Aplikasi	24
+3.4.2 Tahap Pengumpulan Data	24
+3.4.3 Tahap Analisis Data	25
+3.5 Metodologi Analisis Statistik	26
+3.5.1 Uji Asumsi	26
+3.5.2 Three-Way Repeated-Measures ANOVA	26
+3.5.3 Uji Post-hoc Tukey HSD	27
+3.5.4 Analisis Trade-off Deskriptif	27
+3.6 Matriks Kondisi Eksperimen	27
+3.7 Instrumen dan Alat Penelitian	28
+BAB 4 PERANCANGAN SISTEM	29
+4.1 Analisis Kebutuhan Sistem	29
+4.1.1 Identifikasi Aktor Sistem	29
+4.1.2 Kebutuhan Fungsional	29
+4.1.3 Kebutuhan Non-Fungsional	30
+4.2 Use Case	31
+4.2.1 Use Case Diagram	31
+4.2.2 Spesifikasi Use Case	31
+4.3 Perancangan Arsitektur Sistem	36
+4.3.1 Diagram Arsitektur Sistem (3-Layer Architecture)	36
+4.3.2 Class Diagram	38
+4.4 Perancangan Alur Sistem	40
+4.4.1 Activity Diagram Alur utama	41
+4.4.2 Activity Diagram Alur Proses Inferensi	43
+4.4.3 Sequence Diagram	44
+4.5 Perancangan Algoritma	51
+4.5.1 Flowchart Alur Inferensi	51
+4.5.2 State Machine Repetisi	53
+4.5.3 Error Handling & Fallback	54
+4.6 Perancangan Anttarmuka	56
+4.6.1 Wireframe Layar Utama	56
+4.7 Strategi Pengukuran Metrik	57
+4.7.1 Pengukuran Latensi Inferensi	57
+4.7.2 Profiling Sumber Daya Sistem	58
+4.7.3 Struktur File CSV Output	59
+BAB 5 IMPLEMENTASI SISTEM	62
+5.1 Lingkungan Pengembangan	62
+5.2 Implementasi Antarmuka	62
+5.2.1 Struktur Aktivitas Utama	62
+5.2.2 Layar Deteksi & Panel Kontrol	62
+5.3 Implementasi Inferensi TFLite	62
+5.3.1 Pemuatan Model & Inisialisasi Delegate	62
+5.3.2 Antarmuka Detektor	62
+5.3.3 MoveNet Lightning Detector	62
+5.3.4 BlazePose Lite Detector	62
+5.3.5 Letterbox Padding	62
+5.4 Implementasi Algoritma Repetisi	62
+5.4.1 Kalkulator Sudut	62
+5.4.2 Detektor Squat	62
+5.4.3 Detektor Push-Up	62
+5.5 Implementasi Logging & Profilling	62
+5.5.1 Pengukuran Latensi Inferensi	62
+5.5.2 Profilling Sumber Daya	62
+5.5.3 Pencatatan & Ekspor CSV	62
+5.6 Integrasi Komponen	62
+BAB 6 PENGUJIAN DAN PEMBAHASAN	63
+6.1 Persiapan Pengujian	63
+6.2 Statistik Deskriptif	63
+6.3 Validasi Fungsional Penghitungan Repetisi	63
+6.4 Uji Asumsi ANOVA	63
+6.5 Analisis Varians (Three-Way ANOVA)	63
+6.5.1 Latensi Inferensi	63
+6.5.2 Utilisasi CPU	63
+6.5.3 Penggunaan Memori	63
+6.5.4 Ringkasan Signifikansi	63
+6.6 Uji Post-hoc Tukey HSD	63
+6.7 Analisis Trade-off Deskriptif	63
+6.7.1 Kriteria Kelayakan Real-time	63
+6.7.2 Profil Trade-off Kualitatif	63
+6.7.3 Rekomendasi Per Skenario	63
+6.8 Pembahasan	63
+6.8.1 Pengaruh Delegate Terhadap Kinerja	63
+6.8.2 Perbandingan Model	63
+6.8.3 Pengaruh Jenis Latihan	63
+6.8.4 Konfigurasi Optimal	63
+BAB 7 Penutup	64
+7.1 Kesimpulan	64
+7.2 Saran	64
+DAFTAR REFERENSI	65
 DAFTAR TABEL
-Tabel ‎2.1 Pembentukan bilangan random untuk Indeks Masa Tubuh (IMT)	Error! Bookmark not defined.
-Tabel ‎2.2 Contoh tabel 2	Error! Bookmark not defined.
+Tabel ‎2.1 Pembentukan bilangan random untuk Indeks Masa Tubuh (IMT)	18
+Tabel ‎2.2 Contoh tabel 2	19
 
 DAFTAR GAMBAR
-Gambar ‎2.1 Pengaruh nilai K terhadap akurasi	Error! Bookmark not defined.
+Gambar ‎2.1 Pengaruh nilai K terhadap akurasi	21
 
 DAFTAR LAMPIRAN
-LAMPIRAN A PERSYARATAN FISIK DAN TATA LETAK	41
-A.1 Kertas	41
-A.2 Margin	41
-A.3 Jenis dan Ukuran Huruf	41
-A.4 Spasi	41
-A.5 Kepala Bab dan Subbab	41
-A.6 Nomor Halaman	42
-LAMPIRAN B PENGGUNAAN BAHASA	43
+LAMPIRAN A PERSYARATAN FISIK DAN TATA LETAK	38
+A.1 Kertas	38
+A.2 Margin	38
+A.3 Jenis dan Ukuran Huruf	38
+A.4 Spasi	38
+A.5 Kepala Bab dan Subbab	38
+A.6 Nomor Halaman	39
+LAMPIRAN B PENGGUNAAN BAHASA	40
 
  
 PENDAHULUAN
 Latar Belakang
-Aplikasi kebugaran berbasis mobile telah mengalami pertumbuhan signifikan dalam beberapa tahun terakhir, didorong oleh meningkatnya kesadaran masyarakat akan pentingnya gaya hidup sehat dan kemudahan akses teknologi. Menurut Grand View Research (2024), pasar aplikasi kebugaran global mencapai USD 10,59 miliar pada tahun 2024 dan diproyeksikan tumbuh menjadi USD 33,58 miliar pada tahun 2033 dengan tingkat pertumbuhan tahunan gabungan (CAGR) sebesar 13,59% pada periode 2025-2033. Pertumbuhan ini didorong oleh meningkatnya kesadaran masyarakat akan pentingnya gaya hidup sehat, kemudahan akses perangkat mobile, serta inovasi teknologi seperti artificial intelligence (AI) dan machine learning yang memungkinkan personalisasi pengguna secara real-time.
-Real-time pose estimation menjadi salah satu komponen kritis dalam aplikasi kebugaran modern karena memungkinkan sistem memberikan umpan balik (feedback) koreksi postur secara langsung kepada pengguna. Estimasi pose tubuh manusia (human pose estimation) merupakan teknologi computer vision yang mendeteksi dan melacak posisi sendi-sendi utama tubuh manusia dari gambar atau video. Teknologi ini memiliki potensi besar untuk aplikasi kebugaran karena dapat memberikan umpan balik instan mengenai form atau postur latihan yang benar, sehingga dapat meningkatkan efektivitas latihan dan mengurangi risiko cedera. Namun, implementasi sistem estimasi pose pada perangkat bergerak menghadapi tantangan signifikan terkait keterbatasan sumber daya komputasi, memori, dan kapasitas baterai.
-Di Indonesia, penetrasi smartphone telah mencapai tingkat yang sangat tinggi, namun/tetapi karakteristik pasar didominasi oleh perangkat dengan spesifikasi menengah ke bawah. Berdasarkan laporan IDC yang dikutip oleh berbagai media pada tahun 2023, smartphone pada rentang harga di bawah USD 200 menguasai sekitar 76% dari keseluruhan pasar smartphone Indonesia pada kuartal I 2023, meskipun secara tahunan segmen ini masih mengalami penurunan volume pengiriman sekitar 8% [4][5][6]. Kondisi ini menunjukkan dominasi perangkat entry-level yang umumnya memiliki keterbatasan komputasi dan efisiensi daya, sehingga implementasi fitur AI real-time seperti pose estimation perlu dioptimalkan agar tetap responsif. Oleh karena itu, pemilihan konfigurasi Tensorflow Lite delegate (misalnya GPU delegate atau XNNPACK) menjadi penting untuk mencapai latensi rendah dan performa stabil pada perangkat low-to-mid range.
-Salah satu teknologi AI yang memiliki potensi besar dalam aplikasi kebugaran adalah pose estimation, yaitu teknik untuk mendeteksi dan melacak posisi sendi tubuh (keypoints) secara real-time dari citra atau video[7]. Teknologi ini memungkinkan aplikasi untuk memberikan umpan balik kepada pengguna terkait bentuk dan postur tubuh selama melakukan latihan fisik seperti squat, push-up, atau yoga. Berbagai penelitian menunjukkan bahwa pose estimation dapat menyediakan dua jenis umpan balik: descriptive feedback (menginformasikan kesalahan postur) dan prescriptive feedback (mengarahkan cara memperbaiki postur), yang keduanya untuk mencegah cedera dan meningkatkan efektivitas latihan[8][9].
-Beberapa model pose estimation yang populer dan dioptimalkan untuk perangkat mobile antara lain MoveNet dan BlazePose. MoveNet, yang dikembangkan oleh Google, hadir dalam dua varian: Thunder (akurasi lebih tinggi) dan Lightning (kecepatan lebih tinggi)[10]. MoveNet Lightning dirancang untuk kecepatan dengan  ukuran input 192x192 piksel dan, dalam pengukuran resmi TensorFlow Lite, mencapai latensi sekitar 25 ms per frame pada perangkat Pixel 5 dengan GPU delegate untuk movel FP16 terkuantisasi[11][12]. 
-Sementara itu, BlazePose yang dikembangkan oleh Google Research mendeteksi 33 keypoints (lebih banyak dibandingkan 17 keypoints standar COCO) yang lebih sesuai untuk aplikasi kebugaran, dan mampu berjalan secara real-time pada perangkat Pixel 2 pada latensi inferensi di kisaran puluhan milidetik per frame menggunakan akselerasi GPU, sehingga mendukung skenario on-device pose tracking [13][14]. Kedua model ini merepresentasikan pendekatan arsitektur yang berbeda: MoveNet menggunakan pendekatan single-person bottom-up dengan mekanisme smart cropping, sedangkan BlazePose mengadopsi pendekatan two-stage detector-tracker dengan jumlah keypoints yang lebih banyak.
-Meskipun model-model pose estimation modern telah dioptimalkan untuk perangkat mobile, inferensi real-time pada perangkat dengan spesifikasi rendah (harga di bawah USD 200) tetap menjadi tantangan. Faktor-faktor seperti latensi inferensi, konsumsi daya, penggunaan memori, dan utilisasi CPU/GPU sangat mempengaruhi pengalaman pengguna, terutama pada perangkat dengan prosesor dan GPU yang terbatas[15]. Oleh karena itu, diperlukan strategi optimasi yang tepat untuk menyeimbangkan antara performa dan efisiensi energi.
-TensorFlow Lite sebagai framework optimasi model machine learning untuk perangkat mobile menyediakan berbagai engine akselerasi yang dikenal sebagai delegate. Setiap delegate memiliki karakteristik performa yang berbeda: GPU delegate memanfaatkan akselerasi grafis untuk operasi paralel dan, pada model konvolusional tertentu, dapat memberikan percepatan beberapa kali lipat dibanding eksekusi CPU murni; XNNPACK delegate mengoptimalkan eksekusi di CPU dengan memanfaatkan instruksi SIMD (seperti ARM NEON) dan dilaporkan memberikan peningkatan performa rata rata sekitar 2,3× untuk inference floating point dibanding backend CPU standar; sementara eksekusi CPU standar berperan sebagai fallback universal yang menjamin kompatibilitas lintas perangkat. Pemilihan delegate yang tepat sangat krusial untuk memastikan aplikasi dapat berjalan optimal pada perangkat dengan spesifikasi beragam, khususnya di segmen low to mid range.
-Penelitian terdahulu menunjukkan bahwa pemiliihan delegate yang tepat dapat memberikan dampak signifikan terhadap performa inferensi. Sebagai contoh, penelitian oleh Hayakawa et al. (2020) menunjukkan bahwa GPU mobile memberikan akselerasi rata-rata 1.9x dibandingkan CPU, meskipun utilisasi shader core tidak selalu optimal pada beberapa perangkat[20]. Sementara itu, penelitian mengenai konsumsi energi menunjukkan bahwa GPU cenderung mengonsumsi daya lebih tinggi namun dengan throughput yang lebih besar, sedangkan CPU yang lebih efisien untuk model berukuran kecil[21][22].  Di sisi lain, penelitian benchmarking seperti MLPerf Mobile menunjukkan bahwa kinerja delegate sangat bergantung pada kombinasi model, ukuran input, dan karakteristik hardware, serta bahwa akselerator tertentu dapat memberikan keuntungan besar pada model besar tetapi tidak selalu optimal untuk model kecil.
-Namun demikian, sebagian besar penelitian sebelumnya dilakukan pada perangkat kelas menengah ke atas (seperti Google Pixel atau Samsung Galaxy Flagship) dan belum banyak yang secara khusus mengevaluasi performa delegate pada perangkat low-end yang mendominasi pasar Indonesia. Selain itu, perbandingan antara model pose estimation (MoveNet vs BlazePose) dengan berbagai konfigurasi delegate pada perangkat low-end masih sangat terbatas. Padahal, pemahaman mengenai trade-off antara latensi, konsumsi daya, dan akurasi pada perangkat low-end sangat penting untuk mengembangkan aplikasi kebugaran yang dapat diakses oleh mayoritas pengguna di Indonesia.
-Oleh karena itu, penelitian ini bertujuan untuk melakukan evaluasi komprehensif terhadap performa tiga delegate TensorFlow Lite (GPU, XNNPACK, dan CPU) pada dua model pose estimation (MoveNet Lightning dan BlazePose Lite) di perangkat Android low-to-mid range yang representatif terhadap kondisi pasar di Indonesia. Penelitian ini diharapkan dapat memberikan rekomendasi praktis bagi pengembang aplikasi kebugaran mengenai konfigurasi optimal untuk mencapai keseimbangan antara performa, efisiensi energi, dan aksesibilitas pada perangkat dengan spesifikasi terbatas.
-Penelitian sebelumnya menunjukkan bahwa model pose estimation seperti MoveNet dan BlazePose telah dioptimalkan untuk deployment pada perangkat mobile. MoveNet Lightning dirancang khusus untuk kecepatan dengan ukuran input 192×192 piksel dan mencapai inferensi 25ms pada Pixel 5 dengan GPU delegate (Google Research, 2021). Di sisi lain, BlazePose menggunakan pendekatan detector-tracker yang efisien dengan waktu inferensi 33ms pada Pixel 2 dan mampu mendeteksi 33 keypoints dalam ruang 3D (Bazarevsky et al., 2020). Kedua model ini merepresentasikan pendekatan arsitektur yang berbeda: MoveNet menggunakan bottom-up approach dengan smart cropping, sedangkan BlazePose menggunakan two-stage detector-tracker.
-Celah riset yang signifikan teridentifikasi, yaitu kurangnya analisis sistematis perbandingan kinerja berbagai delegate TensorFlow Lite untuk implementasi real-time pose estimation pada perangkat Android low-to-mid range dalam konteks aplikasi kebugaran. Setiap delegate memiliki karakteristik optimasi yang berbeda. GPU delegate dapat memberikan peningkatan kecepatan hingga 5x lipat untuk operasi paralel (Google AI Edge, 2024), namun memiliki overhead inisialisasi yang tinggi dan konsumsi daya lebih besar. XNNPACK Delegate mengoptimalkan operasi CPU dengan peningkatan performa hingga 2.3x dibanding CPU standar (TensorFlow Blog, 2024), dengan efisiensi energi yang lebih baik. Eksekusi CPU standar memberikan konsistensi lintas perangkat namun dengan performa lebih rendah.
-Domain kebugaran dipilih karena memerlukan akurasi tinggi untuk keamanan (safety) pengguna, latensi rendah untuk responsivitas real-time, dan efisiensi energi untuk penggunaan berkelanjutan. Pemilihan delegate yang tidak tepat dapat mengakibatkan performa aplikasi yang suboptimal, pengalaman pengguna yang buruk, atau konsumsi baterai yang berlebihan. 
-Untuk menjawab tantangan komputasi pada perangkat mobile tersebut, Google mengembangkan model arsitektur efisien seperti MoveNet dan Mediapipe BlazePose yang diklaim ringan (lightweight) dan cocok untuk perangkat mobile. Meskipun demikian, kinerja inferensi aktual sangat bergantung pada bagaimana beban komputasi didistribusikan ke unit pemrosesan yang tepat (CPU, GPU, atau XNNPACK) melalui mekanisme delegate di TensorFlow Lite. Hasil penelitian ini diharapkan dapat memberikan panduan empiris bagi para developer untuk memilih konfigurasi delegate dan model yang optimal berdasarkan karakteristik perangkat target dan prioritas aplikasi, sehingga aplikasi kebugaran berbasis pose estimation dapat diakses oleh pengguna dengan beragam spesifikasi perangkat.
+Kesadaran masyarakat akan gaya hidup sehat dan pesatnya adopsi teknologi telah mendorong pertumbuhan masif aplikasi kebugaran berbasis mobile. Mengutip data Grand View Research (2024), valuasi pasar global aplikasi kebugaran diproyeksikan melonjak dari USD 10,59 miliar pada tahun 2024 menjadi 33,58 miliar pada tahun 2033 dengan tingkat  peertumbuhan tahunan (CAGR) sebesar 13,59%. Lonjakan ini tidak terlepas dari inovasi artificial intelligence (AI) dan machine learning yang kini memungkinkan aplikasi untuk memberikan evaluasi personal secara real-time kepada penggunanya.
+Salah satu fitur AI yang paling relevan untuk aplikasi kebugaran adalah real-time pose estimation, teknologi computer vision yang mendeteksi dan melacak posisi sendi-sendi utama tubuh manusia dari kamera secara langsung. Dengan kemampuan ini, aplikasi dapat memberikan umpan balik secara instan kepada pengguna mengenai postur dan teknik gerakan selama latihan, baik berupa descriptive feedback yang menginformsikan kesalahan postur maupun prescriptive feedback yang mengarahkan cara memperbaikinya (Essuming, 2024; Tharatipyakul, Srikaewsiew and Pongnumkul, 2024). Hal ini menjadikan pose estimation komponen yang sangat bernilai untuk mencegah cedera dan meningkatkan efektivitas latihan (Chen dan Yang, 2020).
+Namun, menjalankan pose estimation secara real-time di perangkat mobile bukan hal yang mudah. Proses inferensi model deep learning menuntut sumber daya komputasi yang besar, sementara perangkat mobile memiliki keterbatasan di sisi CPU, memori, dan baterai. Terlebih, pada kondisi berkepanjangan, beban komputasi yang tinggi dapat menyebabkan thermal throttling, yaitu penurunan frekuensi prosesor akibat panas berlebih, hal ini berdampak pada penuruan frame rate dan responsivitas aplikasi (Lee et al., 2019; Benoit-Cattin and Fernández-Berni, 2020).
+Kondisi ini menjadi semakin kritis apabila dikaitkan dengan realitas karakteristik pasar smartphone di Indonesia. Berdasarkan laporan IDC (2023), sekitar 76% pasar smartphone Indonesia di kuartal I 2023 dikuasai oleh perangkat dengan harga di bawah USD 200 (DetikInet, 2023; Katadata, 2023; Selular.ID, 2023). Segmen low-to-mid range ini umumnya dilengkapi prosesor dan GPU dengan kapablitas terbatas dibandingkan perangkat kelas atas. Dengan demikian, apabila aplikasi kebugaran berbasis pose estimation tidak dioptimasi untuk karakteristik perangkat ini, mayoritas pengguna Indonesia tidak akan dapat menikmati fitur ini secara layak.
+Dua model pose estimation yang paling relevan dan banyak digunakan untuk konteks mobile adalah MoveNet Lightning dan BlazePose Lite, keduanya dikembangkan oleh Google. MoveNet Lightning menggunakan pendekatan bottom-up dengan mekanisme smart cropping dan menerima input beresolusi 192×192 piksel. Model ini mencapai latensi sekitar 25 ms per frame pada perangkat Pixel 5 menggunakan GPU delegate dengan kuantisasi FP16, menjadikannya pilihan utama untuk aplikasi yang memprioritaskan kecepatan (TensorFlow Blog, 2021; TensorFlow Lite, 2024). BlazePose Lite, di sisi lain, menggunakan pendekatan two-stage detector-tracker dan mendeteksi 33 keypoints yang lebih rinci dibandingkan 17 keypoints standar COCO pada MoveNet, dengan latensi inferensi di kisaran 25–33 ms pada Pixel 2 menggunakan GPU (Bazarevsky and Grishchenko, 2020). Perbedaan arsitektur dan jumlah keypoints keduanya menjadikan perbandingan antara dua model ini menarik untuk dievaluasi dalam konteks aplikasi kebugaran.
+Untuk menjembatani kebutuhan performa tinggi dengan keterbatasan perangkat keras, TensorFlow Lite (yang sejak September 2024 direbrand oleh Google menjadi LiteRT) menyediakan mekanisme delegate, sebuah cara untuk mendistribusikan beban komputasi inferensi ke unit pemrosesan yang paling sesuai. Terdapat tiga opsi utama: GPU Delegate yang memanfaatkan akselerasi grafis dan dapat memberikan peningkatan kecepatan hingga 5x untuk operasi paralel (Google AI Edge, 2024); XNNPACK Delegate yang mengoptimalkan eksekusi CPU melalui instruksi SIMD seperti ARM NEON dengan peningkatan performa rata-rata 2,3x dibanding baseline CPU standar (Google AI Edge, 2024); dan CPU Baseline yang menjadi fallback universal tanpa akselerasi tambahan. Pemilihan delegate yang tepat merupakan keputusan arsitektur yang kritis karena secara langsung memengaruhi latensi, konsumsi daya, dan stabilitas termal aplikasi (Ignatov et al., 2018).
+Penelitian terdahulu telah memberikan sejumlah gambaran awal mengenai karakteristik masing-masing delegate. Jiang et al. (2020) menemukan bahwa GPU mobile memberikan akselerasi rata-rata 1,9x dibandingkan CPU, meskipun efisiensi shader core tidak selalu optimal pada semua perangkat. Studi mengenai konsumsi energi menunjukkan bahwa GPU cenderung mengonsumsi daya lebih tinggi namun menghasilkan throughput yang lebih besar, sedangkan CPU lebih efisien untuk model berukuran kecil (Ignatov et al., 2018; Lee et al., 2019). Evaluasi komprehensif dari MLPerf Mobile (Reddi et al., 2022) juga menunjukkan bahwa keunggulan relatif setiap delegate sangat bergantung pada kombinasi model, ukuran input, dan karakteristik hardware perangkat target.
+Namun demikian, sebagian besar penelitian tersebut dilakukan pada perangkat kelas menengah ke atas seperti Google Pixel atau Samsung Galaxy flagship, dan bukan pada perangkat yang merepresentasikan pasar Indonesia. Selain itu, penelitian yang secara spesifik membandingkan MoveNet Lightning dan BlazePose Lite pada berbagai konfigurasi delegate di perangkat low-to-mid range masih sangat terbatas (Bazarevsky and Grishchenko, 2020; Yu et al., 2023). Ketiadaan studi semacam ini menyulitkan pengembang dalam mengambil keputusan teknis yang tepat saat membangun aplikasi kebugaran untuk pengguna Indonesia.
+Selain kesenjangan pada sisi perangkat dan model, terdapat pula kesenjangan metodologis. Sebagian besar penelitian hanya berfokus pada satu metrik tunggal,  biasanya akurasi atau kecepatan inferensi saja, tanpa mempertimbangkan trade-off yang lebih komprehensif antara latensi, konsumsi sumber daya, dan stabilitas performa dalam durasi penggunaan nyata (Turner et al., 2024). Padahal, dalam konteks aplikasi kebugaran, ketiganya sama pentingnya: akurasi dibutuhkan untuk keamanan pengguna, latensi rendah diperlukan untuk feedback yang responsif, dan efisiensi daya penting agar aplikasi dapat digunakan sepanjang sesi latihan tanpa perangkat menjadi panas berlebih.
+Gerakan squat dan push-up dipilih sebagai beban kerja uji dalam penelitian ini karena keduanya merupakan gerakan fundamental yang paling umum diimplementasikan dalam penelitian pose estimation berbasis kebugaran (Heo et al., 2022; Bao et al., 2024). Selain itu, keduanya merepresentasikan dua pola gerakan yang berbeda secara biomekanik, dalam hal ini, squat sebagai gerakan vertikal yang berpusat pada sendi lutut, sementara push-up sebagai gerakan horizontal yang berpusat pada sendi siku, sehingga dapat merepresentasikan variasi workload yang lebih beragam dalam pengujian.
+Berdasarkan kesenjangan yang telah diidentifikasi, penelitian ini dirancang untuk melakukan evaluasi sistematis terhadap kinerja tiga konfigurasi delegate TensorFlow Lite (GPU, XNNPACK, dan CPU Baseline) pada dua model pose estimation (MoveNet Lightning dan BlazePose Lite) di perangkat Android low-to-mid range yang representatif terhadap pasar Indonesia, dalam konteks penggunaan nyata aplikasi kebugaran. Hasil penelitian ini diharapkan dapat memberikan panduan empiris bagi pengembang dalam memilih konfigurasi teknis yang optimal sesuai target perangkat, sehingga aplikasi kebugaran berbasis AI dapat diakses secara layak oleh mayoritas pengguna di Indonesia.
 Rumusan Masalah
 	Bagaimana perbandingan kinerja inferensi (latensi dan throughput) serta konsumsi sumber daya (utilisasi CPU, memori) antara GPU delegate, CPU with XNNPACK delegate, dan CPU-only execution pada TensorFlow Lite untuk real-time pose estimation dalam aplikasi kebugaran Android?
 	Bagaimana perbandingan kinerja antara model MoveNet Lightning dan BlazePose Lite pada setiap konfigurasi delegate dalam konteks aplikasi kebugaran mobile?
-	Konfigurasi delegate dan model manakah yang memberikan keseimbangan optimal antara kinerja, efisiensi sumber daya, dan akurasi untuk perangkat Android low-to-mid range?
+	Konfigurasi delegate dan model manakah yang memberikan performa terbaik secara keseluruhan berdasarkan analisis trade-off antara kinerja, efisiensi sumber daya, dan akurasi untuk perangkat Android low-to-mid range?
+Hipotesis
+Berdasarkan kajian literatur mengenai karakteristik teknis masing-masing delegate TensorFlow Lite dan arsitektur kedua model pose estimation, penelitian ini merumuskan empat hipotesis sebagai berikut.
+H1: Terdapat perbedaan yang signifikan dalam latensi inferensi dan throughput antar konfigurasi delegate, di mana GPU Delegate diperkirakan menghasilkan latensi terendah dibandingkan XNNPACK dan CPU Baseline, khususnya pada model MoveNet Lightning yang didominasi operasi konvolusional yang dapat diparalelkan secara efisien di GPU (Jiang et al., 2020; Google AI Edge, 2024).
+H2: Terdapat perbedaan yang signifikan dalam utilisasi sumber daya antar konfigurasi delegate, di mana GPU Delegate diperkirakan menghasilkan utilisasi CPU yang lebih rendah namun dengan konsumsi memori yang lebih tinggi akibat alokasi buffer GPU, sementara XNNPACK Delegate diperkirakan lebih efisien dalam konsumsi daya dibandingkan GPU Delegate (Ignatov et al., 2018; Lee et al., 2019).
+H3: Tidak terdapat perbedaan yang signifikan dalam metrik performa inferensi antara jenis latihan squat dan push-up, karena kedua gerakan diproses melalui alur inferensi yang identik dan model tidak membedakan jenis gerakan pada tahap inferensi (pose-agnostic inference).
+H4: Terdapat interaksi yang signifikan antara faktor delegate dan faktor model, di mana keunggulan akselerasi GPU Delegate diperkirakan lebih besar pada BlazePose Lite dibandingkan MoveNet Lightning, mengingat BlazePose Lite memiliki kompleksitas komputasi yang lebih tinggi akibat pendekatan two-stage detector-tracker dan jumlah keypoints yang lebih banyak (Bazarevsky and Grishchenko, 2020).
 Tujuan
-Berdasarkan rumusan masalah di atas, penelitan memiliki tujuan sebagai berikut:
-	Mengukur dan membandingkan kinerja inferensi (latensi dan throughput) serta konsumsi sumber daya (utilisasi CPU, memori) antara GPU, CPU with XNNPACK, dan CPU-only execution untuk real-time pose estimation pada aplikasi kebugaran Android.
-	Mengevaluasi perbandingan kinerja antara model MoveNet Lightning dan BlazePose Lite pada setiap konfigurasi delegate dalam konteks aplikasi kebugaran mobile.
-	Mengidentifikasi konfigurasi delegate dan model yang memberikan keseimbangan optimal antara kinerja, efisiensi sumber daya, dan akurasi untuk aplikasi estimasi pose pada perangkat Android low-to-mid range.
+Berdasarkan rumusan masalah yang telah diuraikan, penelitian ini bertujuan untuk:
+	Mengukur dan membandingkan kinerja komputasi—seperti latensi inferensi, throughput (FPS), serta penggunaan CPU dan memori—antara GPU delegate, CPU with XNNPACK, dan eksekusi CPU-only pada TensorFlow Lite.
+	Mengevaluasi perbedaan performa antara model MoveNet Lightning dan BlazePose Lite saat dijalankan menggunakan berbagai konfigurasi delegate tersebut di lingkungan aplikasi mobile.
+	Menemukan kombinasi delegate dan model yang paling optimal, yakni yang mampu memberikan keseimbangan (trade-off) terbaik antara performa kecepatan, efisiensi sumber daya, dan kelancaran aplikasi pada perangkat Android kelas menengah ke bawah (low-to-mid range).
 Manfaat
-Penelitian ini diharapkan dapat memberikan sejumlah manfaat yang bernilai bagi berbagai pihak.
-	Bagi komunitas pengembang perangkat lunak, hasil penelitian ini dapat menyediakan data benchmark yang bersifat kuantitatif dan objektif sebagai dasar pengambilan keputusan teknis dalam pemilihan delegate TensorFlow Lite yang paling sesuai dengan kebutuhan aplikasi, baik dari sisi efisiensi energi maupun akurasi. Selain itu, penelitian ini juga memberikan panduan praktis untuk mengoptimalkan implementasi pose estimation pada aplikasi kebugaran di berbagai konfigurasi perangkat keras Android, khususnya untuk perangkat low-to-mid range yang mendominasi pasar Indonesia, sehingga dapat membantu pengembang dalam meningkatkan performa aplikasi secara efektif dan memperluas jangkauan pengguna.
-	Bagi komunitas akademis, penelitian ini berkontribusi dalam mengisi kesenjangan riset yang ada dengan menghadirkan studi komparatif formal mengenai performa berbagai delegate TensorFlow Lite dalam konteks aplikasi mobile dengan fokus pada perangkat dengan keterbatasan sumber daya. Hasilnya dapat dijadikan referensi bagi penelitian lanjutan di bidang analisis performa perangkat lunak maupun rekayasa sistem mobile. Lebih dari itu, metodologi eksperimen yang dikembangkan dalam penelitian ini dapat diadaptasi dan diterapkan untuk mengevaluasi performa delegate pada domain aplikasi lain di masa mendatang.
-	Bagi industri teknologi kesehatan, penelitian ini memberikan wawasan teknis yang bermanfaat dalam mengembangkan aplikasi kebugaran berbasis kecerdasan buatan yang lebih efisien, responsif, dan ramah pengguna. Dengan pemahaman mendalam terhadap performa masing-masing delegate, pengembang di sektor ini dapat merancang solusi fitness berbasis AI yang mampu berjalan optimal pada beragam tingkat spesifikasi perangkat Android, sehingga memperluas aksesibilitas dan pengalaman pengguna secara keseluruhan, terutama bagi segmen pasar dengan daya beli menengah ke bawah.
+Penelitian ini diharapkan dapat memberikan kontribusi nyata bagi beberapa pihak berikut:
+	Bagi Pengembang Perangkat Lunak (Developer): Menyediakan data pengujian yang objektif sebagai acuan teknis. Data ini akan sangat membantu pengembang dalam memilih konfigurasi TensorFlow Lite yang paling efisien, sehingga mereka dapat merancang aplikasi AI kebugaran yang tetap responsif dan hemat baterai meskipun dijalankan pada smartphone dengan spesifikasi terbatas.
+	Bagi Akademisi dan Peneliti: Mengisi celah riset terkait evaluasi performa on-device machine learning khusus di kelas perangkat low-end. Selain itu, metode pengujian dan benchmarking yang digunakan dalam penelitian ini dapat diadaptasi untuk menguji arsitektur model AI lainnya di masa depan.
+	Bagi Industri Teknologi Kesehatan: Memberikan wawasan teknis untuk menekan beban komputasi sistem. Dengan pemahaman ini, industri dapat merancang layanan kebugaran pintar yang lebih inklusif dan menjangkau pasar yang lebih luas, terutama pengguna di segmen menengah ke bawah.
+	Bagi Pengguna Akhir: Prototipe aplikasi yang dibangun dalam penelitian ini menunjukkan penerapan pose estimation untuk membantu pengguna menghitung repetisi latihan squat dan push-up secara otomatis. Walaupun aplikasi tidak diposisikan sebagai produk kebugaran final, fitur deteksi pose dan penghitungan repetisi memberikan gambaran manfaat langsung teknologi ini pada skenario latihan sederhana.
 Batasan Masalah
-Untuk menjaga agar penelitian tetap fokus dan terarah, ruang lingkup penelitian ini dibatasi pada aspek berikut :
-	Platform dan Lingkungan Pengujian: Penelitian ini diimplementasikan menggunakan library TensorFlow Lite versi 2.14.0 (atau terbaru yang stabil) pada sistem operasi Android dengan target SDK API Level 34 (Android 14).
-	Model Pose Estimation: Penelitian menggunakan dua varian model pre-trained yang telah dioptimalkan untuk perangkat mobile, yaitu:
-	MoveNet Lightning (INT8): Model ultra-cepat dengan input resolusi rendah (192x192), merepresentasikan beban kerja ringan.
-	MediaPipe BlazePose Lite (FP16): Model berbasis topologi 33 keypoints dengan kompleksitas deteksi 3D, merepresentasikan beban kerja menengah.
-	Perangkat Keras (Device Testbed): Pengujian dilakukan pada dua kategori perangkat pintar (smartphone) untuk memvalidasi performa akselerasi perangkat keras pada segmen pasar yang berbeda:
-	Low-End Device: Samsung Galaxy A06 (Chipset MediaTek Helio G85, GPU Mali-G52, RAM 4GB) sebagai representasi perangkat dengan sumber daya terbatas.
-	Mid-Range Device: Samsung Galaxy A33 5G (Chipset Exynos 1280, GPU Mali-G68, RAM 6/8GB) sebagai representasi perangkat modern dengan dukungan NPU.
-	Fokus Pengukuran Kinerja: Penelitian ini hanya berfokus pada pengukuran kinerja komputasi (computational performance), yang meliputi parameter: Latensi Inferensi (Inference Time), Frame Per Second (FPS), Penggunaan CPU/GPU, dan Konsumsi Memori (RAM). 
-
+Agar penelitian lebih fokus dan pembahasannya tidak melebar, ruang lingkup pengujian dibatasi pada parameter berikut:
+	Lingkungan Pengembangan: Implementasi sistem dibangun menggunakan library TensorFlow Lite versi 2.14.0 (atau rilis stabil terbaru) pada sistem operasi Android, dengan target pengembangan API Level 34 (Android 14).
+	Model Machine Learning: Eksperimen hanya menggunakan dua varian model pre-trained dengan format kuantisasi FP16, yaitu:
+	MoveNet Lightning: Model berukuran sangat ringan dengan resolusi input 192x192, digunakan untuk merepresentasikan beban komputasi yang rendah.
+	MediaPipe BlazePose Lite: Model dengan topologi deteksi 33 keypoints tubuh, digunakan untuk merepresentasikan beban komputasi menengah.
+	Perangkat Uji (Testbed): Pengujian akan dilakukan secara langsung pada dua jenis smartphone untuk melihat perbandingan performa di segmen keras yang berbeda:
+	Perangkat Low-End: Samsung Galaxy A06 (Chipset MediaTek Helio G85, GPU Mali-G52, RAM 4GB) sebagai perwakilan perangkat dengan sumber daya terbatas.
+	Perangkat Mid-Range: Samsung Galaxy A33 5G (Chipset Exynos 1280, GPU Mali-G68, RAM 6/8GB) sebagai perwakilan perangkat modern yang memiliki spesifikasi menengah.
+	Fokus pengukuran kinerja utama penelitian ini adalah kinerja komputasi, meliputi latensi inferensi, FPS, utilisasi CPU, dan penggunaan memori. Evaluasi akurasi model pose estimation seperti mAP berada di luar lingkup penelitian. Namun, penelitian ini tetap melakukan pengujian fungsional terbatas kepada end user untuk memvalidasi ketepatan penghitungan repetisi squat dan push-up pada skenario penggunaan nyata. Hasil pengujian fungsional tersebut dilaporkan secara deskriptif dan tidak dimasukkan ke dalam analisis ANOVA.
 Sistematika Pembahasan
-Untuk memberikan gambaran yang jelas mengenai alur penelitian, laporan skripsi ini disusun dengan sistematika sebagai berikut:
-BAB I PENDAHULUAN: Berisi latar belakang masalah yang mengidentifikasi pentingnya optimasi delegate TensorFlow Lite untuk aplikasi kebugaran pada perangkat low-to-mid range, rumusan masalah yang spesifik dan terukur, tujuan penelitian, manfaat yang diharapkan, batasan masalah yang jelas, serta sistematika pembahasan.
-BAB II LANDASAN KEPUSTAKAAN: Menguraikan tinjauan literatur mengenai penelitian terkait di bidang pose estimation mobile dan optimasi TensorFlow Lite, serta teori-teori pendukung mengenai arsitektur delegate TensorFlow Lite, model MoveNet, metrik evaluasi kinerja aplikasi mobile, dan metodologi penelitian eksperimental.
-BAB III METODOLOGI PENELITIAN: Menjelaskan secara rinci desain eksperimen kuantitatif, variabel penelitian, teknik pengumpulan data menggunakan profiling tools, serta metodologi analisis statistik menggunakan uji ANOVA untuk memvalidasi hipotesis.
-BAB IV PERANCANGAN SISTEM: Menguraikan tahapan perancangan aplikasi testbed yang digunakan sebagai alat ukur, meliputi analisis kebutuhan fungsional dan non-fungsional, perancangan arsitektur sistem, diagram alir (flowchart) logika inferensi dan penghitungan repetisi, serta rancangan antarmuka pengguna (wireframe).
-BAB V PENGEMBANGAN APLIKASI: Menguraikan realisasi sistem berdasarkan rancangan, meliputi implementasi antarmuka, integrasi library TensorFlow Lite, serta pengkodean logika inferensi dan mekanisme logging data. 
-BAB VI PENGUJIAN DAN PEMBAHASAN: Menyajikan data hasil benchmarking secara sistematis (latensi, throughput, sumber daya), analisis statistik menggunakan uji ANOVA, serta pembahasan mendalam (deep dive) untuk menjawab rumusan masalah.
-BAB VII PENUTUP: Berisi kesimpulan yang menjawab setiap rumusan masalah berdasarkan analisis data empiris, kontribusi penelitian terhadap body of knowledge, keterbatasan penelitian yang diidentifikasi selama proses eksperimen, serta saran untuk pengembangan penelitian di masa mendatang.
+Untuk memudahkan pemahaman alur penelitian, laporan skripsi ini disusun menjadi tujuh bab dengan rincian sebagai berikut:
+	BAB 1 Pendahuluan: Menjelaskan latar belakang perlunya optimasi TensorFlow Lite pada perangkat low-to-mid range, perumusan masalah, tujuan dan manfaat penelitian, batasan ruang lingkup pengujian, serta sistematika penulisan.
+	BAB 2 Landasan Kepustakaan: Mengkaji literatur penelitian terdahulu yang sejalan, serta teori-teori dasar mengenai arsitektur pose estimation, MoveNet, BlazePose, mekanisme kerja delegate di TensorFlow Lite, dan metrik kinerja komputasi mobile.
+	BAB 3 Metodologi Penelitian: Memaparkan tahapan desain eksperimen kuantitatif, penentuan variabel pengujian, teknik pengumpulan metrik performa, dan metode analisis statistik (seperti uji ANOVA) yang digunakan untuk memvalidasi data.
+	BAB 4 Perancangan Sistem: Menguraikan rancangan aplikasi testbed yang digunakan sebagai alat ukur, meliputi arsitektur perangkat lunak, alur logika program (flowchart) untuk inferensi model, dan rancangan antarmuka pengguna.
+	BAB 5 Pengembangan Aplikasi: Menjelaskan tahap realisasi pembuatan aplikasi berdasarkan rancangan sebelumnya, mencakup proses integrasi library AI dan penulisan kode untuk pencatatan (logging) metrik performa sistem.
+	BAB 6 Pengujian dan Pembahasan: Menyajikan tabulasi data hasil pengujian performa secara terstruktur, penjabaran hasil analisis statistik, serta diskusi mendalam untuk membandingkan kinerja setiap kombinasi model dan delegate.
+	BAB 7 Penutup: Menarik kesimpulan akhir untuk menjawab rumusan masalah berdasarkan bukti empiris yang didapat, menyebutkan keterbatasan selama penelitian, serta memberikan saran bagi riset pengembangan selanjutnya.
+
 LANDASAN KEPUSTAKAAN
 Kajian Pustaka
-Kajian Pustaka dilakukan untuk mengidentifikasi penelitian yang telah ada di bidang analisis kinerja aplikasi mobile, khususnya yang berkaitan dengan framework TFLite dan pose estimation. Dari penelusuran tesebut, beberapa studi menjadi rujukan utama yang menyoroti celah penelitian yang hendak diisi oleh studi ini. Berikut hasil dari kajian pustaka disajikan dalam Tabel 2.1
-			Tabel 2.1 Penelitian Terdahulu
+Kajian Pustaka dilakukan untuk mengidentifikasi penelitian yang telah ada di bidang analisis kinerja aplikasi mobile, khususnya yang berkaitan dengan framework TFLite dan pose estimation. Dari penelusuran tersebut, beberapa studi menjadi rujukan utama yang menyoroti celah penelitian yang hendak diisi oleh studi ini. Berikut hasil dari kajian pustaka disajikan dalam Tabel 2.1
+Tabel 2.1 Penelitian Terdahulu            
 Penulis	Judul	Metode	Hasil	Gap Penelitian
 Bazarevsky et al. (2020)	BlazePose: On-device Real-time Body Pose tracking	CNN multitahap dengan detector-tracker approach, 33 keypoints 3D	mAP 66,9%, 33ms inferensi pada Pixel 2 GPU	Hanya mengevaluasi GPU delegate tanpa membandingkan alternatif optimasi lainnya seperti CPU, XNNPACK atau NNAPI
 Yu et al. (2023)	MovePose: A High-performance Human Pose Estimation Algorithm on Mobile and Edge Devices	Optimasi pose estimation untuk edge/mobile devices	mAP 68,0%, 11+ fps pada Android Snapdragon 8	Tidak menspesifikasi jenis delegate yang digunakan dan tidak menganalisis trade-off resource consumption
 Turner et al. (2024)	A Mobile-Phone Pose Estimation for Gym-Exercise Form Correction	Machine learning dengan deteksi anomali untuk koreksi postur gym	Sistem dapat mendeteksi postur salah dan memberikan koreksi valid dalam video real-time	Tidak menyediakan metrik kinerja kuantitatif (latency, CPU, memory) yang esensial untuk evaluasi mobile
 Reddi et al. (2022)	MLPerf Mobile INference Benchmark	Evaluasi komprehensif TensorFlow Lite delegates dan PyTorch backends pada 174 skenario	GPU delegate memberikan speedup signifikan untuk model besar, namun overhead untuk model kecil	Bersifat general ML benchmarking, tidak spesifik untuk domain pose estimation dan aplikasi real-time
+Ignatov et al. (2019)	AI Benchmark: All About Deep Learning on Smartphones in 2019	Benchmarking komprehensif 10+ model deep learning pada 48 perangkat Android menggunakan TFLite delegates (CPU, GPU, NNAPI)	GPU delegate 2-5x lebih cepat dari CPU; konsumsi daya GPU lebih tinggi; performa sangat bergantung pada chipset	Tidak spesifik untuk pose estimation; tidak mengevaluasi XNNPACK delegate; tidak mempertimbangkan konteks aplikasi kebugaran real-time
+Jiang et al. (2020)	Characterizing the Deployment of Deep Neural Networks on Commercial Edge Devices	Analisis perbandingan performa inferensi pada CPU dan GPU mobile menggunakan TFLite pada 5 perangkat edge komersial	GPU memberikan speedup rata-rata 1.9x; utilisasi shader core tidak selalu optimal; latensi GPU tinggi untuk model kecil	Tidak mengevaluasi NNPACK delegate; model yang diuji bukan pose estimation; tidak mencakup perangkat low-end pasar Indonesia
 
-Ada beberapa penelitian yang telah dilakukan sebelumnya dan dapat dijadikan referensi serta referensi, pertama, penelitian oleh Bazarevsky et al. (2020) mengembangkan BlazePose sebagai solusi terobosan untuk estimasi pose real-time pada perangkat bergerak. Penelitian mereka mengatasi tantangan fundamental dalam implementasi pose estimation pada perangkat dengan keterbatasan sumber daya melalui arsitektur detector-tracker yang efisien. Model BlazePose menggunakan pendekatan dua tahap: tahap pertama mendeteksi keberadaan manusia dalam frame, dan tahap kedua melakukan tracking 33 keypoints dalam ruang 3D. Hasil eksperimen menunjukkan model dapat mencapai akurasi mean Average Precision (mAP) sebesar 66,9% dengan waktu inferensi rata-rata 33ms pada Google Pixel 2 menggunakan GPU delegate. Namun, penelitian ini hanya mengevaluasi satu jenis delegate tanpa membandingkan alternatif optimasi lainnya seperti CPU atau XNNPACK, sehingga belum memberikan analisis menyeluruh terkait trade-off kinerja. 
-Yu et al. (2023) mengembangkan MovePose sebagai algoritme pose estimation berkinerja tinggi yang dirancang khusus untuk deployment pada edge dan mobile devices. Pendekatan mereka menggunakan tiga teknik optimasi utama: dekonvolusi untuk meningkatkan resolusi feature maps, konvolusi dengan kernel besar untuk memperluas receptive field, dan metode klasifikasi koordinat untuk presisi lokalisasi keypoints. Evaluasi pada dataset COCO validation menunjukkan MovePose mencapai mAP 68,0% dengan throughput 11+ fps pada perangkat Android dengan prosesor Snapdragon 8. Meskipun menunjukkan kinerja yang superior, penelitian ini tidak menspesifikasi jenis delegate TensorFlow Lite yang digunakan dan tidak memberikan analisis mendalam tentang trade-off antara berbagai opsi akselerasi perangkat keras atau konsumsi sumber daya.
-Reddit et al. (2022) melakukan evaluasi komprehensif terhadap kinerja inferensi machine learning pada perangkat bergerak melalui MLPerf Mobile benchmark suite, dengan fokus khusus pada perbandingan berbagai implementasi delegate TensorFlow Lite dan backend PyTorch. Penelitian mereka mencakup pengujian pada 174 skenario berbeda yang meliputi variasi model, ukurna input, dan konfigurasi perangkat keras. Temuan utama menunjukkan bahwa GPU delegate memberikan speedup signifikan untuk model dengan ukuran besar dan operasi yang dapat diparalelkan, namun dapat menjadi bottleneck untuk model kecil karena overhead komunikasi antara CPU dan GPU. Penelitian ini memberikan pemahaman berharga tentang karakterisitik kinerja berbagai delegate, namun bersifat umum dan tidak spesifik untuk domain aplikasi pose estimation yang memiliki karakterisitik workload unik.
-Turner dkk. (2024) mengembangkan sistem koreksi postur untuk latihan gym menggunakan kombinasi machine learning dan metode deteksi anomali. Sistem mereka dirancang untuk mendeteksi penyimpangan dari form latihan yang benar dan memberikan feedback korektif dalam waktu nyata. Pendekatan mereka menggunakan pose estimation sebagai input untuk algoritme deteksi anomali yang dapat mengidentifikasi gerakan yang berpotensi berbahaya atau tidak efektif. Hasil eksperimen menunjukkan sistem mampu mendeteksi postur yang salah dan memberikan koreksi yang valid dalam video real-time. Namun, penelitian ini memiliki kelemahan signifikan dalam tidak menyediakan metrik kinerja kuantitatif seperti latensi inferensi, utilisasi CPU, atau konsumsi memori, yang penting untuk evaluasi implementasi pada perangkat bergerak..
+Bazarevsky and Grishchenko (2020) mengembangkan BlazePose sebagai solusi on-device, real-time pose tracking pada perangkat mobile menggunakan arsitektur dua tahap: pose detector yang menemukan region of interest (ROI) tubuh manusia, dan pose tracker yang memperkirakan 33 keypoints 3D di dalam ROI tersebut. Hasil pengujian pada Google Pixel 2 menunjukkan model dapat berjalan di atas 30 FPS dengan akurasi sekitar 66,9% mAP. Namun, penelitian ini hanya mengevaluasi konfigurasi GPU delegate tanpa perbandingan sistematis terhadap delegate lain, serta tidak mengukur metrik konsumsi daya dan memori secara kuantitatif.
+Yu et al. (2023) memperkenalkan MovePose sebagai algoritme pose estimation berkinerja tinggi yang dioptimalkan untuk perangkat edge dan mobile. Model ini memanfaatkan kombinasi dekonvolusi untuk meningkatkan resolusi feature map, kernel konvolusi besar untuk memperluas receptive field, dan skema klasifikasi koordinat untuk meningkatkan presisi lokalisasi keypoints. Evaluasi pada dataset COCO menunjukkan MovePose mencapai mAP sekitar 68% dengan throughput lebih dari 11 FPS pada perangkat Snapdragon 8. Meski demikian, studi ini tidak mendeskripsikan secara eksplisit delegate inferensi yang digunakan, dan tidak mengevaluasi konsumsi sumber daya perangkat.
+Reddi et al. (2022) melalui MLPerf Mobile menyajikan benchmark suite untuk mengukur kinerja inferensi mobile pada ratusan kombinasi model, framework, dan backend termasuk TensorFlow Lite delegates dan PyTorch. Hasilnya menunjukkan bahwa GPU delegate menguntungkan untuk model besar, tetapi overhead komunikasi CPU-GPU dapat membuatnya kurang efisien untuk model kecil. Studi ini memberikan gambaran umum yang berguna mengenai karakteristik delegate, tetapi tidak membahas kasus penggunaan spesifik seperti pose estimation atau aplikasi kebugaran.
+Ignatov et al. (2019) mengusulkan AI Benchmark sebagai tolok ukur terstandarisasi untuk evaluasi kinerja deep learning pada smartphone Android, mencakup lebih dari sepuluh model dan puluhan perangkat. Hasilnya menunjukkan bahwa performa inferensi sangat bergantung pada kombinasi model, backend (CPU, GPU, NNAPI), dan chipset, dengan GPU umumnya memberikan percepatan 2-5x namun dengan konsumsi daya lebih tinggi. Benchmark ini tidak fokus pada pose estimation dan belum mengevaluasi XNNPACK delegate.
+Jiang et al. (2020) melakukan profiling inferensi deep learning pada GPU mobile menggunakan TensorFlow Lite dan menunjukkan bahwa GPU dapat memberikan percepatan rata-rata ~1,9x dibanding CPU, namun terdapat variasi besar antar perangkat. Mereka juga menggarisbawahi bahwa untuk model kecil, overhead GPU dapat mengurangi manfaat percepatan. Studi ini tidak menyentuh konteks pose estimation atau perangkat kelas bawah yang relevan untuk pasar Indonesia.
+Turner et al. (2024) merancang sistem koreksi postur latihan gym berbasis pose estimation pada smartphone. Sistem menggunakan keypoints dari model pose estimation sebagai input ke modul deteksi anomali yang mengidentifikasi deviasi dari form latihan yang benar dan memberikan umpan balik korektif secara real-time. Walaupun relevan untuk konteks kebugaran, fokus utama penelitian ini adalah kualitas koreksi postur, bukan analisis kuantitatif terhadap latensi, utilisasi CPU/GPU, dan konsumsi memori di perangkat mobile.
+
 Gap Penelitian
-Berdasarkan hasil tinjauan pustaka, terdapat beberapa celah penelitian yang cukup signifikan dan relevan untuk dikaji lebih lanjut. Pertama, belum ada penelitian yang secara sistematis menganalisis kinerja berbagai delegate TensorFlow Lite dalam konteks estimasi pose, khususnya untuk aplikasi kebugaran. Studi seperti Reddi et al. (2022) hanya melakukan benchmarking umum, sementara Bazarevsky et al. (2020) berfokus pada penggunaan GPU delegate tanpa membandingkan trade-off kinerja antara delegate lain.
-Kedua, sebagian besar penelitian masih terbatas pada skenario terkontrol atau berbasis dataset standar, sehingga kurang merepresentasikan kondisi dunia nyata. Evaluasi dalam konteks aplikasi kebugaran yang sebenarnya dengan variabilitas pencahayaan, kecepatan gerakan pengguna, serta durasi penggunaan yang panjang, serta keterbatasan hardware pada perangkat low-to-mid range masih jarang dilakukan.
-Ketiga, penelitian sebelumnya umumnya hanya berfokus pada satu metrik seperti akurasi atau kecepatan inferensi, tanpa mempertimbangkan trade-off komprehensif yang mencakup latensi, konsumsi sumber daya, dan efisiensi baterai secara bersamaan. Terakhir, belum ada metodologi evaluasi yang terstandarisasi dan dapat direplikasi untuk mengukur kinerja delegate TensorFlow Lite secara menyeluruh pada aplikasi estimasi pose bergerak. Hal ini menciptakan kebutuhan akan framework evaluasi yang sistematis, terukur, serta dapat diadaptasi untuk penelitian selanjutnya di bidang ini.
-Keempat, perbandingan sistematis antara model-model pose estimation terkini (MoveNet Lightning dan BlazePose Lite) dengan berbagai konfigurasi delegate pada perangkat Android yang representatif terhadap pasar Indonesia belum dilakukan. Hal ini penting mengingat karakteristik hardware yang berbeda dapat menghasilkan performa relatif yang berbeda pula antar delegate.
-Terakhir, belum ada metodologi evaluasi yang terstandarisasi dan dapat direplikasi untuk mengukur kinerja delegate Tensorflow Lite secara menyeluruh pada aplikasi pose estimation, khususnya dengan mempertimbangkan konteks perangkat low-to-mid range. Hal ini menciptakan kebutuhan akan framework evaluasi yang sistematis, terukur, serta dapat diadaptasi untuk penelitian selanjutnya di bidang ini.
+Berdasarkan kajian pustaka di atas, terdapat empat celah penelitian yang relevan dan menjadi landasan bagi penelitian ini.             
+Pertama, belum terdapat penelitian yang secara sistematis menganalisis kinerja berbagai delegate TensorFlow Lite (CPU, GPU, XNNPACK) dalam konteks pose estimation untuk aplikasi kebugaran. Studi seperti Reddi et al. (2022) hanya membahas perbandingan delegate secara umum, sedangkan Bazarevsky and Grishchenko (2020) berfokus pada satu konfigurasi GPU delegate tanpa membandingkan trade-off kinerja dengan delegate lain.
+Kedua, sebagian besar penelitian dilakukan pada perangkat kelas menengah ke atas dan skenario dataset standar, sehingga kurang merepresentasikan kondisi nyata pengguna perangkat low-to-mid range. Evaluasi dalam konteks aplikasi kebugaran yang berjalan secara kontinu dengan variasi kondisi penggunaan dan keterbatasan sumber daya perangkat masih jarang dilakukan (Ignatov et al., 2019).
+Ketiga, sebagian besar studi hanya berfokus pada satu metrik seperti akurasi model atau kecepatan inferensi, tanpa mempertimbangkan trade-off komprehensif antara latensi, throughput, utilisasi CPU, penggunaan memori, dan konsumsi daya secara bersamaan. Dalam konteks aplikasi kebugaran, seluruh aspek ini sama pentingnya untuk menjamin pengalaman pengguna yang baik.
+Keempat, belum ada penelitian yang secara eksplisit membandingkan MoveNet Lightning dan BlazePose Lite pada berbagai konfigurasi delegate di perangkat Android low-to-mid range yang merepresentasikan pasar Indonesia. Mengingat bahwa kombinasi arsitektur model dan delegate dapat menghasilkan profil kinerja yang sangat berbeda pada chipset yang berbeda (Jiang et al., 2020), studi komparatif di kelas perangkat ini menjadi penting untuk memberikan rekomendasi praktis bagi pengembang.
 Landasan Teori
-Landasan teori ini membahas lima komponen utama yang mendasari penelitian, yaitu konsep fundamental estimasi pose tubuh manusia, kerangka kerja TensorFlow Lite sebagai platform inferensi model pembelajaran mesin, model MoveNet  dan BlazePose sebagai representasi estimasi pose mutakhir untuk perangkat bergerak, pengembangan aplikasi Android sebagai konteks implementasi, serta metrik kinerja dan framework evaluasi yang digunakan untuk mengevaluasi performa delegate secara empiris.
+Landasan teori pada bab ini membahas konsep dan teknologi utama yang mendasari penelitian, meliputi: estimasi pose tubuh manusia, biomekanik gerakan squat dan push-up, framework TensorFlow Lite dan sistem delegate-nya, model MoveNet dan BlazePose Lite, fenomena thermal throttling pada inferensi mobile, pengembangan aplikasi Android sebagai platform implementasi, metrik kinerja aplikasi bergerak, serta analisis varians (ANOVA) sebagai metode analisis statistik.
 Pose Estimation
-Estimasi pose tubuh manusia (Human Pose Estimation) merupakan proses mendeteksi posisi titik-titik kunci tubuh manusia (keypoints) seperti kepala, bahu, siku, lutut, dan pergelangan kaki dari citra atau video. Dalam konteks 2D pose estimation, setiap keypoint direpresentasikan dengan korrdinat (x,y) dan confidence score yang menunjukkan tingkat kepercayaan deteksi. State-of-the-art pose estimation model umumnya mendeteksi 17 keypoints yang mencakup sendi-sendi utama tubuh manusia berdasarkan standar COCO keypoint annotations: hidung, mata kiri, mata kanan, telinga kiri, telinga kanan, bahu kiri, bahu kanan, siku kiri, siku kanan, pergelangan tangan kiri, pergelangan tangan kanan, pinggul kiri, pinggul kanan, lutut kiri, lutut kanan, pergelangan kaki kiri, dan pergelangan kaki kanan. 
-Pose estimation memiliki berbagai aplikasi praktis, termasuk dalam bidang kebugaran dan olahraga. Dalam konteks aplikasi kebugaran, pose estimation digunakan untuk: Mendeteksi penyimpangan dari postur yang benar selama latihan, sehingga dapat mencegah cedera dan meningkatkan efektivitas latihan (Turner et al., 2024). Melacak gerakan berulang dalam latihan seperti squat, push-up, atau sit-up untuk memberikan feedback otomatis kepada pengguna. Memberikan insights tentang kualitas gerakan, rentang gerak (range of motion), dan konsistensi dalam melakukan latihan.
-Untuk implementasi pada perangkat mobile, pose estimation menghadapi tantangan khusus terkait keterbatasan sumber daya komputasi, memori, dan daya baterai. Oleh karena itu, model-model seperti MoveNet dan BlazePose dirancang khusus dengan arsitektur yang efisien untuk dapat berjalan real-time pada perangkat mobile tanpa mengorbankan akurasi secara signifikan.
-Tensorflow Lite
-Tensorflow Lite adalah framework open-source yang dikembangkan oleh Google untuk menjalankan model machine learning pada perangkat mobile, embedded, dan IoT dengan keterbatasan sumber daya(Google, 2024). Framework ini menyediakan tools untuk mengonversi model Tensorflow standar menjadi format yang dioptimalkan (.tflite) dengan ukuran lebih kecil dan latensi inferensi lebih rendah.
-Optimasi model dalam TensorFlow Lite dilakukan melalui beberapa teknik. Quantization mengurangi presisi dari float32 ke int8 atau int16, mengurangi ukuran model hingga 4x dan meningkatkan kecepatan inferensi (Google AI Edge, 2024). Pruning menghilangkan weights yang tidak signifikan untuk mengurangi kompleksitas model. Operator fusion menggabungkan multiple operations menjadi single operation untuk mengurangi memory access dan meningkatkan throughput.
-Delegate System merupakan fitur kunci TensorFlow Lite yang memungkinkan percepatan hardware-specific. GPU Delegate memanfaatkan Graphics Processing Unit untuk operasi paralel, sangat efektif untuk convolutional layers dengan speedup hingga 5x (Google AI Edge, 2024). XNNPACK Delegate mengoptimalkan operasi CPU menggunakan SIMD instructions (ARM NEON, SSE), memberikan peningkatan 2-3x dibanding CPU baseline (TensorFlow Blog, 2024). CPU Fallback menyediakan eksekusi universal untuk semua operator, menjamin kompatibilitas lintas perangkat.
-Pemilihan delegate yang tepat bergantung pada karakteristik model, workload aplikasi, dan hardware target. GPU delegate optimal untuk model dengan banyak convolutional operations, namun memiliki overhead initialization. XNNPACK efisien untuk model yang sudah well-optimized dan cocok untuk perangkat tanpa GPU dedicated. CPU fallback menjamin konsistensi namun dengan performa terendah.
+Estimasi pose tubuh manusia (human pose estimation) adalah proses mendeteksi posisi titik-titik kunci (keypoints) tubuh — seperti kepala, bahu, siku, lutut, dan pergelangan kaki — dari citra atau video. Dalam konteks 2D pose estimation, setiap keypoint direpresentasikan sebagai pasangan koordinat (x, y) pada bidang gambar beserta confidence score yang menunjukkan tingkat keyakinan model terhadap deteksi tersebut. Model state-of-the-art umumnya mengikuti skema anotasi COCO yang terdiri dari 17 keypoints utama, meliputi hidung, kedua mata, kedua telinga, kedua bahu, kedua siku, kedua pergelangan tangan, kedua pinggul, kedua lutut, dan kedua pergelangan kaki (TensorFlow Blog, 2021).
+Dalam konteks aplikasi kebugaran, pose estimation dimanfaatkan untuk tiga keperluan utama: (1) mendeteksi penyimpangan dari postur latihan yang benar sehingga dapat mengurangi risiko cedera dan meningkatkan efektivitas latihan; (2) melacak jumlah repetisi gerakan seperti squat, push-up, dan sit-up secara otomatis; serta (3) memberikan wawasan mengenai kualitas gerakan, range of motion, dan konsistensi latihan (Chen and Yang, 2020; Turner et al., 2024).
+Implementasi pose estimation di perangkat mobile menghadapi tantangan terkait keterbatasan daya komputasi, memori, dan kapasitas baterai dibandingkan dengan komputer desktop atau server. Oleh karena itu, model yang ditujukan untuk perangkat mobile seperti MoveNet dan BlazePose dirancang dengan arsitektur yang lebih ringan dan dukungan akselerasi perangkat keras agar tetap mampu berjalan secara real-time (Bazarevsky and Grishchenko, 2020; TensorFlow Blog, 2021).
+Biomekanik Gerakan Squat dan Push-up
+Deteksi repetisi dan penilaian kualitas gerakan dalam aplikasi kebugaran berbasis pose estimation memerlukan pemahaman dasar biomekanik gerakan yang dianalisis. Parameter utama yang digunakan adalah sudut sendi (joint angle), yaitu sudut yang dibentuk oleh tiga keypoints yang merepresentasikan segmen tulang di sekitar sendi target.
+Secara geometris, sudut sendi pada titik sendi B dihitung dari koordinat tiga keypoints A, B, dan C menggunakan fungsi arc-tangent dua argumen (atan2). 
+
+θ= | atan2(C_y- B_y,C_x- B_x )- atan2(A_y- B_y,A_x- B_x )|* 180π     (2.1)
+Pendekatan atan2 dipilih karena mempertahankan informasi kuadran sehingga menghasilkan sudut yang benar untuk semua orientasi tubuh, berbeda dengan pendekatan dot product yang hanya menghasilkan nilai antara 0° hingga 180° tanpa informasi arah fleksi maupun ekstensi (Chen and Yang, 2020).
+Gerakan Squat
+Squat merupakan gerakan multi-sendi yang melibatkan fleksi dan ekstensi terkoordinasi pada sendi lutut dan pinggul. Dalam konteks pose estimation, sudut lutut dihitung dari keypoints pinggul (hip), lutut (knee), dan pergelangan kaki (ankle), sedangkan sudut pinggul dihitung dari bahu (shoulder), pinggul, dan lutut (Appiah et al., 2024). Kajian biomekanik menunjukkan bahwa kedalaman squat yang dianggap valid secara fungsional umumnya berkaitan dengan fleksi lutut mencapai sekitar 90° atau lebih dalam, kondisi yang dikenal sebagai parallel squat ketika paha sejajar dengan lantai (Straub and Powers, 2024; Chen and Yang, 2020).
+Berdasarkan rentang tersebut, penelitian ini menetapkan bahwa satu repetisi squat dinyatakan valid apabila sudut lutut mencapai ≤90° pada fase turun (descent phase), yang menandakan paha telah sejajar atau sedikit melewati bidang horizontal. Fase naik (ascent phase) ditandai dengan kembalinya sudut lutut ke posisi ekstensi penuh (≥160°). Penghitungan repetisi menggunakan state machine sederhana dengan transisi DOWN (θ_lutut ≤ 90°) → UP (θ_lutut ≥ 160°) dihitung sebagai satu repetisi valid.
+Gerakan Push-up
+Push-up adalah gerakan yang berpusat pada sendi siku dengan pola fleksi dan ekstensi lengan bawah sambil menjaga stabilitas batang tubuh. Sudut siku dihitung dari keypoints bahu (shoulder), siku (elbow), dan pergelangan tangan (wrist) (Appiah et al., 2024). Literatur biomekanik menunjukkan bahwa posisi bawah push-up yang efektif umumnya melibatkan fleksi siku sekitar 60°-90°, yaitu ketika dada berada dekat permukaan lantai (San Juan et al., 2015).
+Berdasarkan rentang tersebut, penelitian ini menetapkan bahwa satu repetisi push-up dinyatakan valid apabila sudut siku mencapai ≤70° pada fase turun (down phase). Fase naik ditandai dengan kembalinya sudut siku ke posisi ekstensi penuh (≥160°). State machine push-up bekerja identik dengan squat: transisi DOWN (θ_siku ≤ 70°) → UP (θ_siku ≥ 160°) dihitung sebagai satu repetisi valid.
+Penggunaan dua ambang batas (DOWN dan UP) menggantikan satu ambang tunggal bertujuan menghindari double counting akibat fluktuasi sudut di sekitar nilai batas — pendekatan yang dikenal sebagai hysteresis dalam sistem kontrol (Chen and Yang, 2020). Implementasi teknis state machine ini dijabarkan lebih lanjut dalam Flowchart Penghitungan Repetisi pada Bab 4.
+Tabel 2.2 Parameter State Machine Penghitungan Repetisi
+Gerakan	Sendi	Keypoints (A-B-C)	Threshold DOWN	Threshold UP
+Squat	Lutut (kiri/kanan)	Hip – Knee – Ankle	≤ 90°	≥ 160°
+Push-up	Siku (kiri/kanan)	Shoulder – Elbow – Wrist	≤ 70°	≥ 160°
+
+TensorFlow Lite
+TensorFlow Lite adalah framework open-source yang dikembangkan oleh Google untuk menjalankan model machine learning pada perangkat mobile, embedded, dan IoT dengan keterbatasan sumber daya (TensorFlow Lite, 2024). Framework ini menyediakan alat untuk mengonversi model TensorFlow standar menjadi format .tflite yang lebih ringkas sehingga ukuran model menjadi lebih kecil dan latensi inferensi menurun.
+Beberapa teknik optimasi yang didukung TensorFlow Lite meliputi: (1) kuantisasi (quantization), yaitu penurunan presisi bobot dari float32 ke int8 atau int16 yang dapat mengurangi ukuran model hingga sekitar empat kali lipat; (2) pruning, yaitu penghapusan bobot yang bernilai kecil untuk mengurangi kompleksitas model tanpa penurunan akurasi yang berarti; dan (3) operator fusion, yaitu penggabungan beberapa operasi berturut-turut menjadi satu operasi terpadu untuk mengurangi akses memori dan overhead eksekusi (Google AI Edge, 2024).
+Selain optimasi di tingkat model, TensorFlow Lite menyediakan mekanisme delegate system sebagai fitur utama untuk memanfaatkan akselerator perangkat keras yang tersedia pada perangkat target. Mekanisme ini dibahas lebih lanjut pada subbab 2.2.4.
+Sistem Delegate TensorFlow Lite
+Delegate dalam TensorFlow Lite adalah modul yang memungkinkan sebagian atau seluruh graf komputasi model dialihkan dari eksekusi CPU standar ke backend akselerasi tertentu, seperti GPU atau pustaka optimasi CPU (Google AI Edge, 2024). Setiap delegate berinteraksi dengan hardware melalui API spesifik platform sehingga pengembang dapat memanfaatkan kemampuan akselerasi tanpa mengubah kode model. Pemilihan delegate yang tepat merupakan keputusan arsitektur yang kritis karena secara langsung memengaruhi latensi inferensi, konsumsi daya, dan stabilitas termal aplikasi mobile (Ignatov et al., 2019).
+GPU delegate memanfaatkan GPU perangkat melalui API OpenGL ES atau OpenCL untuk menjalankan operasi tensor secara paralel. Arsitektur GPU yang terdiri dari banyak inti pemroses sederhana sangat cocok untuk operasi konvolusi yang bersifat paralel, sehingga pada model konvolusional tertentu GPU dapat memberikan percepatan beberapa kali lipat dibanding eksekusi CPU murni (Ignatov et al., 2019; Jiang et al., 2020). Namun, GPU delegate memiliki startup overhead yang signifikan karena memerlukan kompilasi dan inisialisasi shader saat pertama kali dijalankan, serta cenderung mengonsumsi daya lebih tinggi karena aktivasi GPU yang intensif. Tidak semua operator TensorFlow Lite didukung oleh GPU delegate, sehingga operator yang tidak kompatibel akan di-fallback ke CPU secara otomatis (Google AI Edge, 2024).
+XNNPACK delegate adalah pustaka optimasi CPU yang memanfaatkan instruksi SIMD seperti ARM NEON pada arsitektur ARM modern untuk mempercepat operasi inti jaringan saraf tiruan. XNNPACK juga melakukan operator fusion untuk mengurangi akses memori dan overhead eksekusi. Integrasi XNNPACK ke TensorFlow Lite dilaporkan memberikan peningkatan performa rata-rata sekitar 2,3x untuk inferensi floating-point dibanding backend CPU standar pada berbagai model (TensorFlow Blog, 2020). Keunggulan utama XNNPACK dibanding GPU delegate adalah tidak memerlukan akselerator khusus, tidak memiliki startup overhead yang besar, dan umumnya lebih hemat daya.
+CPU Baseline adalah mode eksekusi default TensorFlow Lite tanpa akselerasi hardware tambahan, menggunakan kemampuan pemrosesan CPU standar secara sekuensial (Google AI Edge, 2024). Mode ini menjamin kompatibilitas penuh dengan semua operator TFLite pada semua perangkat Android dan menjadi fallback universal. Meskipun menghasilkan latensi tertinggi di antara ketiga opsi, CPU Baseline penting sebagai titik acuan untuk mengkuantifikasi keuntungan nyata dari penggunaan GPU delegate maupun XNNPACK.
+Beberapa studi menunjukkan bahwa keunggulan relatif antara GPU delegate dan XNNPACK sangat bergantung pada ukuran model, jenis operasi yang dominan, dan karakteristik chipset perangkat target (Jiang et al., 2020; Ignatov et al., 2019). Hal ini menjadi salah satu alasan utama perlunya evaluasi empiris pada perangkat Samsung Galaxy A06 dan A33 5G yang merepresentasikan segmen low-to-mid range di Indonesia.
 Model MoveNet
-MoveNet adalah model estimasi pose mutakhir yang dikembangkan oleh Google khusus untuk perangkat bergerak. Model ini dirancang untuk mendeteksi 17 titik kunci (keypoints) tubuh manusia dengan akurasi tinggi dan latensi rendah (Google Research, 2021). MoveNet menggunakan arsitektur pendekatan bottom-up berdasarkan CenterNet detection API dengan MobileNetV2 sebagai feature extractor.
-Arsitektur MoveNet mengimplementasikan algoritme smart cropping yang meningkatkan akurasi pada video dengan melakukan zum ke wilayah dimana pose terdeteksi pada frame sebelumnya (Google Research, 2021). Pendekatan ini memungkinkan model melihat detail yang lebih halus dan membuat prediksi yang lebih akurat, sangat efektif untuk aplikasi kebugaran dimana subjek relatif statis dalam frame.
-MoveNet tersedia dalam dua varian utama yang mengakomodasi trade-off antara kecepatan dan akurasi (Google Research, 2021):
-MoveNet Lightning dioptimalkan untuk kecepatan dengan ukuran masukan 192×192 piksel dan depth multiplier 1,0. Model ini mampu mencapai waktu inferensi 25ms pada Pixel 5 dengan GPU delegate, menjadikannya ideal untuk aplikasi waktu nyata yang memprioritaskan responsivitas (Google Research, 2021). Akurasi model mencapai 63,0% mAP dengan ukuran model 4,8MB (kuantisasi FP16). Varian ini sangat sesuai untuk aplikasi kebugaran yang membutuhkan umpan balik segera dan dapat mentolerir akurasi yang sedikit lebih rendah.
-MoveNet Thunder dioptimalkan untuk akurasi dengan ukuran masukan 256×256 piksel dan depth multiplier 1,75. Model ini mencapai 72,0% mAP dengan waktu inferensi 45ms pada Pixel 5 GPU, memberikan keseimbangan yang baik antara akurasi dan kecepatan untuk aplikasi yang memerlukan presisi tinggi (Google Research, 2021). Ukuran model adalah 12,6MB (kuantisasi FP16), lebih tepat untuk aplikasi dimana akurasi kritis untuk keselamatan pengguna.
+MoveNet adalah model estimasi pose yang dikembangkan oleh Google untuk perangkat bergerak dengan fokus pada kecepatan dan keakuratan dalam mendeteksi 17 keypoints tubuh manusia (Google Research, 2021). MoveNet menggunakan pendekatan single-person dengan arsitektur bottom-up berbasis CenterNet dan MobileNetV2 sebagai feature extractor. Fitur khas MoveNet adalah mekanisme smart cropping yang menyesuaikan region of interest (ROI) secara dinamis berdasarkan posisi pose pada frame sebelumnya, sehingga meningkatkan akurasi tanpa menambah beban komputasi secara signifikan.
+MoveNet tersedia dalam dua varian utama yang mengakomodasi trade-off antara kecepatan dan akurasi (TensorFlow Blog, 2021). MoveNet Lightning dioptimalkan untuk kecepatan dengan ukuran masukan 192×192 piksel. Varian ini mampu mencapai latensi sekitar 25 ms per frame pada perangkat Pixel 5 dengan akselerasi GPU delegate dan model FP16, menjadikannya ideal untuk aplikasi real-time yang memprioritaskan responsivitas. Akurasi model mencapai sekitar 63% mAP dengan ukuran model ~4,8 MB. MoveNet Thunder dioptimalkan untuk akurasi dengan ukuran masukan 256×256 piksel, mencapai mAP sekitar 72% dengan latensi ~45 ms pada Pixel 5 GPU, dan lebih tepat untuk aplikasi yang memerlukan presisi tinggi. Dalam penelitian ini, MoveNet Lightning dipilih karena karakteristiknya yang lebih sesuai dengan kebutuhan aplikasi kebugaran real-time.
 Model BlazePose Lite
-BlazePose adalah arsitektur pose estimation yang dikembangkan oleh Google Research untuk real-time body pose tracking pada perangkat mobile (Bazarevsky et al., 2020). Model ini menggunakan pendekatan dua tahap yang terdiri dari pose detector dan pose tracker, memungkinkan deteksi yang cepat dan tracking yang akurat dengan overhead komputasi minimal.
-Arsitektur BlazePose terdiri dari dua komponen utama. Pose Detector menggunakan lightweight CNN untuk mendeteksi region of interest (ROI) yang mengandung tubuh manusia dalam frame. Pose Tracker melakukan prediksi 33 keypoints 3D dalam ROI yang telah dideteksi, dengan tracking temporal untuk konsistensi antar frame. Pendekatan two-stage ini lebih efisien dibanding single-stage detection karena pose tracker hanya perlu memproses ROI kecil setelah deteksi awal.
-BlazePose Lite adalah varian yang dioptimalkan untuk perangkat mobile dengan kompleksitas model yang dikurangi. Model ini mampu mendeteksi 33 keypoints yang mencakup seluruh tubuh, termasuk keypoints wajah dan tangan yang tidak ada di MoveNet. Waktu inferensi mencapai 25-33ms pada Pixel 2 dengan GPU delegate, dengan akurasi mAP 66,9% (Bazarevsky et al., 2020). Ukuran model sekitar 3,5MB (kuantisasi FP16), menjadikannya sangat efisien untuk deployment mobile.
-Keunggulan BlazePose Lite meliputi: detector-tracker approach yang efisien untuk video processing; 33 keypoints memberikan informasi pose yang lebih detail dibanding 17 keypoints standard; model size yang kecil (3,5MB) optimal untuk perangkat dengan keterbatasan storage; temporal consistency melalui tracking mechanism mengurangi jitter dalam deteksi; performa yang konsisten pada berbagai kondisi pencahayaan dan pose complexity.
-Perbandingan MoveNet Lightning vs BlazePose Lite menunjukkan trade-off yang menarik: MoveNet Lightning menggunakan bottom-up approach dengan smart cropping, cocok untuk single-person tracking dengan latency sangat rendah. BlazePose Lite menggunakan detector-tracker approach, lebih robust untuk occlusion dan pose variation dengan detail keypoints lebih tinggi (33 vs 17). Kedua model memiliki ukuran dan latensi inferensi yang sebanding, menjadikan keduanya kandidat ideal untuk penelitian komparatif aplikasi kebugaran Android.
+BlazePose adalah arsitektur pose estimation yang dikembangkan oleh Google Research untuk pelacakan pose tubuh secara real-time pada perangkat mobile (Bazarevsky and Grishchenko, 2020). Model ini menggunakan pendekatan dua tahap: (1) pose detector, yaitu lightweight CNN yang mendeteksi ROI tubuh manusia pada citra; dan (2) pose tracker, yang memperkirakan 33 keypoints 3D di dalam ROI dan memanfaatkan informasi temporal antar-frame untuk meningkatkan stabilitas prediksi.
+BlazePose Lite adalah varian yang dioptimalkan khusus untuk perangkat mobile dengan kompleksitas model yang dikurangi. Varian ini mempertahankan 33 keypoints yang mencakup seluruh tubuh termasuk keypoints wajah dan tangan yang tidak ada di MoveNet. Implementasi BlazePose dapat berjalan di atas 30 FPS pada Google Pixel 2 dengan akselerasi GPU, dengan akurasi sekitar 66,9% mAP dan ukuran model ~3,5 MB (FP16) (Bazarevsky and Grishchenko, 2020).
+Dibanding MoveNet Lightning, BlazePose Lite memberikan representasi pose yang lebih rinci dengan 33 keypoints namun menggunakan arsitektur detector-tracker yang lebih kompleks. Keduanya dirancang untuk perangkat mobile, mendukung delegate TensorFlow Lite, dan menawarkan trade-off berbeda antara jumlah keypoints, latensi, dan kompleksitas komputasi dalam konteks aplikasi kebugaran. Perbandingan inilah yang menjadi salah satu fokus penelitian ini.
+Thermal Throttling pada Inferensi Mobile
+Thermal throttling adalah mekanisme perlindungan perangkat keras di mana prosesor secara otomatis menurunkan frekuensi kerjanya ketika suhu komponen melebihi ambang batas tertentu (Benoit-Cattin and Fernández-Berni, 2020). Pada perangkat mobile yang menggunakan pendinginan pasif (tanpa kipas), panas yang dihasilkan oleh inferensi model deep learning yang berjalan secara kontinu dapat terakumulasi dengan cepat dan memicu kondisi ini.
+Benoit-Cattin and Fernández-Berni (2020) menunjukkan bahwa thermal throttling dapat menurunkan throughput inferensi secara signifikan selama operasi jangka panjang, dengan variasi performa hingga 27,7% tergantung suhu ambien. Lee et al. (2019) juga mencatat bahwa performa inferensi terdegradasi seiring waktu pada skenario penggunaan video real-time yang berjalan terus-menerus akibat akumulasi panas pada prosesor. Fenomena ini sangat relevan untuk penelitian ini karena: (1) aplikasi kebugaran umumnya digunakan dalam sesi yang panjang; (2) perangkat low-end memiliki kapasitas disipasi panas yang lebih terbatas dibanding perangkat kelas atas; dan (3) GPU delegate cenderung menghasilkan panas lebih banyak dibanding XNNPACK atau CPU Baseline karena aktivasi GPU yang intensif.
+Untuk mengendalikan efek thermal throttling dalam pengujian, penelitian ini menerapkan protokol kontrol yang ketat, termasuk pembatasan suhu perangkat di bawah 40°C sebelum setiap sesi pengujian, jeda antar-sesi, dan pengukuran di lingkungan dengan suhu ruang yang stabil (24–26°C).
 Pengembangan Aplikasi Bergerak Android
-Android merupakan sistem operasi bergerak berbasis Linux yang dikembangkan oleh Google untuk perangkat bergerak seperti smartphone dan tablet (Android Developers, 2024). Platform Android menyediakan ekosistem pengembangan yang komprehensif dengan dukungan untuk berbagai bahasa pemrograman dan framework pengembangan aplikasi.
-Sistem operasi Android memiliki arsitektur berlapis yang terdiri dari Linux kernel, hardware abstraction layer (HAL), Android Runtime (ART), framework API, dan lapisan aplikasi (Android Developers, 2024). Arsitektur ini memungkinkan pengembang untuk mengakses fitur perangkat keras melalui API yang konsisten sambil tetap mempertahankan portabilitas lintas perangkat. Linux kernel bertindak sebagai jembatan antara perangkat keras dan lapisan perangkat lunak lainnya, menyediakan fitur keamanan dasar dan manajemen sumber daya (Android Source, 2024).
-Android Studio adalah Integrated Development Environment (IDE) resmi untuk pengembangan aplikasi Android yang dikembangkan oleh Google (Android Developers, 2024). IDE ini menyediakan berbagai fitur untuk mendukung siklus pengembangan aplikasi, termasuk editor kode, debugger, emulator, dan alat profiling kinerja.
-Kotlin adalah bahasa pemrograman yang dikembangkan oleh JetBrains dan telah menjadi bahasa resmi untuk pengembangan Android sejak 2017 (Kotlin Foundation, 2024). Kotlin menawarkan sintaks yang lebih ringkas dibanding Java sambil tetap mempertahankan interoperabilitas penuh dengan kode Java yang ada. Bahasa ini mendukung pemrograman fungsional dan berorientasi objek, serta menyediakan fitur null safety untuk mengurangi kesalahan runtime (Kotlin Documentation, 2024). 
-Jetpack Compose adalah toolkit modern untuk membangun antarmuka pengguna (User Interface) Android menggunakan pendekatan deklaratif (Android Developers, 2024). Compose memungkinkan pengembang untuk mendeskripsikan UI sebagai fungsi dari state aplikasi, membuat proses pengembangan UI lebih intuitif dan efisien.
+Penelitian ini diimplementasikan pada platform Android menggunakan bahasa pemrograman Kotlin dan Android Studio sebagai integrated development environment (IDE). Kotlin merupakan bahasa resmi pengembangan Android sejak 2017 dan menawarkan fitur null safety serta interoperabilitas penuh dengan Java, sehingga memudahkan integrasi dengan pustaka TensorFlow Lite (Kotlin Foundation, 2024).
+Arsitektur sistem operasi Android terdiri atas beberapa lapisan, termasuk Linux kernel, Hardware Abstraction Layer (HAL), dan Android Runtime (ART). HAL berperan penting dalam bagaimana GPU delegate berinteraksi dengan GPU melalui API OpenGL ES, sementara XNNPACK beroperasi pada lapisan CPU melalui instruksi ARM NEON (Android Developers, 2024). Android Neural Networks API (NNAPI) menyediakan antarmuka untuk akselerator AI khusus seperti NPU, namun tidak digunakan dalam penelitian ini karena dukungannya tidak konsisten antar chipset — khususnya tidak tersedia pada Samsung Galaxy A06 — sehingga tidak memungkinkan perbandingan yang adil antar kedua perangkat uji.
+Pengukuran metrik kinerja dalam penelitian ini dilakukan menggunakan: System.nanoTime() untuk mengukur latensi inferensi secara presisi; pembacaan berkas sistem /proc/stat untuk mengukur utilisasi CPU per inti; BatteryManager API untuk mengestimasi konsumsi daya; serta Debug.MemoryInfo API untuk memantau penggunaan memori berdasarkan Proportional Set Size (PSS) — metrik yang lebih akurat dibanding RSS karena memperhitungkan memori yang dibagi antar proses (Android Developers, 2024). Seluruh data dicatat ke dalam berkas CSV pada setiap frame untuk analisis statistik selanjutnya.
 Metrik Kinerja Aplikasi Bergerak
-Dalam konteks evaluasi kinerja aplikasi pose estimation pada perangkat mobile, beberapa metrik kinerja utama perlu diukur untuk memberikan gambaran komprehensif tentang trade-off yang terjadi.
-Latensi inferensi diukur dalam milidetik (ms) dan merepresentasikan waktu yang dibutuhkan untuk memproses satu frame masukan dari pre-processing hingga post-processing (Google AI Edge, 2024). Untuk aplikasi estimasi pose waktu nyata, target latensi maksimal adalah 33ms (30 FPS) untuk memberikan pengalaman yang mulus, dengan target optimal di bawah 20ms untuk gerakan yang cepat. Latensi inferensi diukur menggunakan System.nanoTime() di Java/Kotlin atau TensorFlow Lite Benchmark Tool.
-Throughput diukur dalam frames per second (FPS) dan menunjukkan jumlah frame yang dapat diproses per detik (Google AI Edge, 2024). Target minimum untuk aplikasi kebugaran waktu nyata adalah 20 FPS untuk gerakan dasar dan 30 FPS untuk gerakan dinamis seperti latihan kardiovaaskular. Throughput = 1000 / latensi_rata-rata (ms).
-Utilisasi CPU diukur dalam persentase penggunaan total CPU selama eksekusi aplikasi dan merupakan indikator penting efisiensi komputasi (Android Developers, 2024). Metrik ini penting untuk menilai dampak terhadap kinerja aplikasi lain yang berjalan bersamaan. Utilisasi CPU yang tinggi (>80%) dapat menyebabkan thermal throttling dan mengurangi masa pakai baterai. P engukuran dilakukan menggunakan Android Profiler API atau /proc/stat system file.
-Penggunaan memori (memory usage) mencakup konsumsi RAM untuk menyimpan data aplikasi, struktur data model, dan buffer untuk pemrosesan gambar (Android Developers, 2024). Perangkat bergerak umumnya memiliki keterbatasan memori, sehingga penggunaan memori yang efisien (<100MB untuk aplikasi estimasi pose) penting untuk mencegah kesalahan kehabisan memori dan menjaga stabilitas sistem. Android Runtime (ART) menggunakan garbage collection yang dioptimalkan untuk mengelola memori secara efisien pada perangkat dengan RAM terbatas (Android Source, 2024). Peak memory usage diukur menggunakan Android Memory Profiler atau Debug.MemoryInfo API.
-Konsumsi baterai diukur dalam miliampere-hour (mAh) atau milliwatt (mW) dan merepresentasikan jumlah energi yang dikonsumsi aplikasi selama operasi (Android Developers, 2024). Metrik ini kritis untuk aplikasi bergerak karena baterai merupakan sumber daya terbatas yang mempengaruhi pengalaman pengguna secara keseluruhan. Faktor-faktor yang mempengaruhi konsumsi baterai meliputi intensitas penggunaan CPU, aktivitas GPU, penggunaan sensor, dan transmisi data jaringan. Optimasi konsumsi baterai dapat dicapai melalui manajemen thread yang efisien, pengurangan frekuensi pemrosesan, dan implementasi power-aware scheduling. Pengukuran menggunakan Android Battery Historian atau BatteryManager API.
-Faktor-faktor yang mempengaruhi konsumsi baterai meliputi intensitas penggunaan CPU, aktivitas GPU, penggunaan sensor, dan transmisi data jaringan (Android Developers, 2024). Optimasi konsumsi baterai dapat dicapai melalui manajemen thread yang efisien, pengurangan frekuensi pemrosesan, dan implementasi power-aware scheduling.
-
+Untuk mengevaluasi kinerja aplikasi pose estimation pada perangkat mobile secara komprehensif, penelitian ini menggunakan lima metrik utama berikut.
+Latensi inferensi diukur dalam milidetik (ms) dan merepresentasikan waktu yang dibutuhkan untuk memproses satu frame masukan dari tahap pra-proses hingga pasca-proses. Untuk aplikasi pose estimation real-time, target latensi maksimal adalah sekitar 33 ms (setara 30 FPS) agar gerakan tampak mulus, dengan target optimal di bawah 20 ms untuk gerakan yang cepat (Google AI Edge, 2024).
+Throughput diukur dalam frames per second (FPS) dan menyatakan jumlah frame yang dapat diproses per detik, dihitung sebagai 1000 dibagi latensi rata-rata dalam milidetik. Target minimum yang ditetapkan dalam penelitian ini adalah 20 FPS untuk gerakan dasar dan 30 FPS untuk gerakan yang lebih dinamis.
+Utilisasi CPU diukur dalam persentase penggunaan CPU selama eksekusi dan merupakan indikator penting efisiensi komputasi. Utilisasi CPU yang tinggi (>80%) dapat memicu thermal throttling dan mengurangi masa pakai baterai (Android Developers, 2024). Nilai ini diukur melalui pembacaan /proc/stat.
+Penggunaan memori (RAM) mencakup konsumsi memori oleh model, struktur data, dan buffer pemrosesan gambar. Penggunaan memori yang efisien (ditargetkan <100 MB) penting untuk menghindari out-of-memory dan menjaga stabilitas sistem pada perangkat dengan RAM terbatas. Pengukuran dilakukan menggunakan Debug.MemoryInfo API berdasarkan nilai PSS (Android Developers, 2024).
+Konsumsi daya diestimasi menggunakan BatteryManager API dengan menghitung perkalian tegangan dan arus baterai. Dalam penelitian ini, konsumsi daya dilaporkan secara deskriptif sebagai metrik tambahan — tidak dimasukkan ke dalam analisis ANOVA — mengingat granularitas sensor baterai pada perangkat low-to-mid range tidak memadai untuk sesi pengukuran berdurasi pendek.
 Analisis Varians (ANOVA)
-Menurut Montgomery (2017), ANOVA (Analysis of Variance) digunakan untuk menguji apakah terdapat perbedaan yang signifikan antara rata-rata tiga kelompok atau lebih. Keppel dan Wickens (2004) dalam "Design and Analysis: A Researcher's Handbook"  mengklasifikasikan ANOVA berdasarkan jumlah faktor yang terlibat, yaitu One-Way ANOVA untuk satu faktor independen dan Two-Way ANOVA untuk dua atau lebih faktor independen. 
-Pada penelitian ini, Three-Way Repeated-Measures ANOVA digunakan untuk menguji apakah terdapat perbedaan yang signifikan antara performa inferensi berbagai delegate TensorFlow Lite (CPU, GPU, XNNPACK) berdasarkan metrik kinerja seperti latensi, throughput, utilisasi CPU, penggunaan memori, dan konsumsi baterai, dengan mempertimbangkan faktor model (MoveNet Lightning vs BlazePose Lite) dan jenis latihan (squat vs push-up). Rumus dasar uji ANOVA satu arah adalah sebagai berikut:
-F =  (MS_between)/(MS _within )
-MS_(between )=  (SS_between)/(df _between )   
-MS_within  =  (SS_within)/(df _within )
-
- Keterangan:
-
-MS_(between ) = Sum of Squares Between Groups
- SS_within = Sum of Squares Within Groups
-df _between = degree of freedom between groups (k - 1)
- df _within = degree of freedom within groups (N - k)
- k = jumlah kelompok perlakuan
- N = jumlah total observasi
-Nilai F kemudian dibandingkan dengan nilai F_tabel pada tingkat signifikansi tertentu (misalnya α = 0,05). Jika F_hitung > F_tabel, maka terdapat perbedaan yang signifikan antar kelompok.
-Uji Shapiro-Wilk merupakan uji statistik untuk menguji normalitas distribusi data dengan menghitung statistik W yang membandingkan data sampel dengan distribusi normal teoretis (Shapiro & Wilk, 1965). Nilai p < 0,05 mengindikasikan bahwa data tidak terdistribusi normal, sehingga diperlukan transformasi data atau penggunaan uji nonparametrik. Uji Shapiro-Wilk dipilih karena memiliki power yang tinggi untuk mendeteksi penyimpangan dari normalitas, terutama untuk ukuran sampel kecil hingga menengah (n < 50) (Field, 2018).
-METODOLOGI
+Analisis varians (ANOVA) adalah metode statistik yang digunakan untuk menguji apakah terdapat perbedaan signifikan antara rata-rata lebih dari dua kelompok (Montgomery, 2017). Montgomery (2017) mengklasifikasikan ANOVA berdasarkan jumlah faktor yang terlibat, dari one-way ANOVA untuk satu faktor independen hingga multi-way ANOVA untuk dua faktor atau lebih. Keppel and Wickens (2004) membahas ANOVA dalam konteks desain eksperimen faktorial dan pengukuran berulang (repeated-measures), termasuk cara menginterpretasikan efek utama dan interaksi antar-faktor.
+Dalam penelitian ini, three-way repeated-measures ANOVA digunakan untuk menguji pengaruh tiga faktor — jenis delegate (CPU, XNNPACK, GPU), model pose estimation (MoveNet Lightning vs BlazePose Lite), dan jenis latihan (squat vs push-up) — terhadap metrik kinerja seperti latensi, throughput, utilisasi CPU, dan penggunaan memori. Desain repeated-measures dipilih karena seluruh kondisi pengujian dilakukan pada perangkat yang sama, sehingga pengukuran antar kondisi bersifat dependen. Pendekatan ini mengurangi variasi antar-subjek dan meningkatkan sensitivitas statistik (Field, 2018).
+Rumus dasar uji F pada ANOVA adalah sebagai berikut: 
+F =  (MS_between)/(MS _within )          						(2.2)
+MS_(between )=  (SS_between)/(df _between )    &  MS_within  =  (SS_within)/(df _within )			(2.3)
+ Nilai F kemudian dibandingkan dengan F_tabel pada tingkat signifikansi α = 0,05. Jika F_hitung > F_tabel, terdapat perbedaan signifikan antar kelompok.
+Sebelum ANOVA dijalankan, beberapa asumsi harus dipenuhi. Normalitas residu diuji menggunakan uji Shapiro-Wilk (Shapiro and Wilk, 1965), yang memiliki statistical power yang baik untuk ukuran sampel kecil hingga menengah (Field, 2018).
+Data frame-level yang diperoleh dari CSV terlebih dahulu dibersihkan dengan menghapus frame warm-up, frame dengan latensi 0 ms, dan outlier ekstrem. Setelah itu, data diagregasi menjadi data session-level berdasarkan perangkat, replikasi, model, delegate, dan jenis latihan. 
+Analisis statistik dilakukan secara terpisah untuk setiap perangkat karena penelitian hanya menggunakan satu unit perangkat pada masing-masing kategori low-end dan mid-range. Dengan demikian, perangkat tidak diperlakukan sebagai faktor inferensial dalam ANOVA. Untuk data yang lengkap dan seimbang, analisis dilakukan menggunakan three-way repeated-measures ANOVA dengan delegate, model, dan jenis latihan sebagai faktor dalam-subjek. Analisis dilakukan menggunakan pustaka statsmodels pada Python. 
+Apabila hasil ANOVA menunjukkan efek yang signifikan, analisis lanjutan dilakukan menggunakan pairwise comparison berpasangan dengan koreksi Holm. Koreksi Holm digunakan untuk mengontrol family-wise error rate pada pengujian berulang antar pasangan kondisi.
+ Homogenitas varians diuji menggunakan uji Levene, dan asumsi sphericity untuk data repeated-measures diuji menggunakan uji Mauchly. Apabila asumsi sphericity dilanggar, koreksi Greenhouse-Geisser diterapkan. Jika asumsi parametrik secara keseluruhan tidak terpenuhi, analisis digantikan dengan uji Friedman atau Kruskal-Wallis sebagai alternatif nonparametrik. Apabila ANOVA menunjukkan hasil yang signifikan, uji lanjut Tukey HSD dilakukan untuk mengidentifikasi pasangan kelompok yang berbeda nyata, dengan pengendalian family-wise error rate pada α = 0,05. Ukuran efek dihitung menggunakan partial eta-squared (η²p).
+METODOLOGI PENELITIAN
 Jenis Penelitian
-Penelitian ini merupakan penelitian kuantitatif dengan pendekatan eksperimental yang bersifat analitik-komparatif. Tujuannya adalah untuk membandingkan performa berbagai konfigurasi delegate TensorFlow Lite (GPU, XNNPACK, CPU) pada dua model pose estimation (MoveNet Lightning dan BlazePose Lite) untuk aplikasi estimasi pose real-time di perangkat bergerak. Aplikasi yang dikembangkan tidak dimaksudkan sebagai produk akhir, melainkan berfungsi sebagai test harness atau alat ukur untuk mengumpulkan data performa dan akurasi secara objektif. Pendekatan eksperimen terkontrol digunakan agar setiap variabel dapat diuji secara sistematis dengan kondisi yang konsisten, sehingga hasil penelitian dapat direplikasi dan divalidasi.
-Strategi penelitian ini menggunakan desain faktorial penuh (full factorial design) untuk menguji pengaruh tiga variabel bebas: jenis delegate TensorFlow Lite, varian model MoveNet, dan jenis latihan yang akan dilakukan. Dengan menggabungkan seluruh kombinasi dari ketiga faktor tersebut, diperoleh rancangan eksperimen 3×2×2 yang menghasilkan 12 kondisi pengujian, dengan setiap kondisi dieksekusi 30 kali untuk memastikan kekuatan statistik yang memadai (total 360 eksperimen). Pengulangan sebanyak 30 kali dipilih berdasarkan central limit theorem yang menyatakan bahwa distribusi samping means akan mendekati normal untuk n >= 30, memungkinkan penggunaan uji statistik parametrik (Montgomery, 2017). Power analysis a priori menggunakan G*Power 3.1 dengan α=0.05, power (1-β)=0.80, dan medium effect size (f=0.25) menunjukkan minimum sample size n=24 untuk three-way ANOVA. Dengan demikian, n=30 memberikan adequate statistical power dengan buffer untuk outlier removal.
+Penelitian ini merupakan penelitian kuantitatif dengan pendekatan eksperimental yang bersifat analitik-komparatif. Tujuannya adalah membandingkan performa berbagai konfigurasi delegate TensorFLow Lite (GPU, XNNPACK, CPU Baseline) pada dua model pose estimation (MoveNet Lightning dan BlazePose Lite) untuk aplikasi estimasi pose real-time di perangkat Android. Aplikasi yang dikembangkan tidak dimaksudkan sebagai produk akhir, melainkan berfungsi sebagai test harness atau alat ukur untuk mengumpulkan data performa secara objektif dan terkontrol.
+Pendekatan eksperimen terkontrol dipilih agar setiap variabel dapat diuji secara sistematis dengan kondisi yang konsisten, sehingga hasil penelitian dapat direplikasi dan divalidasi. Strategi penelitian ini menggunakan desain faktorial penuh (full factorial design) 3x2x2, yaitu tiga level delegate x dua varian model x dua jenis latihan, yang menghasilkan 12 kondisi pengujian per perangkat. Setiap kondisi dieksekusi sebanyak 30 kali (replikasi) berdasarkan Central Limit Theorem yang menyatakan bahwa distribusi sampel rata-rata mendekato normal untuk n > 30, sehingga memungkinkan penggunaan uji statistik parametrik (Montgomery, 2017). Power analysis a priori menggunakan G*Power 3.1 dengan α = 0.05, power (1-β) = 0.80, dan medium effect size (f = 0.25) menunjukkan minimum sample size n = 24 untuk three-way ANOVA. Dengan demikian, n = 30 memberikan kekuatan statistik yang memadai dengan buffer untuk data pencilan.
+Pengujian dilakukan secara independen pada dua perangkat uji, yaitu Samsung Galaxy A06 (low-end) dan Samsung Galaxy A33 (mid-range). Analisis ANOVA dijalankan secara terpisah untuk setiap perangkat, menghasilkan dua set hasil yang kemudian dibandingkan secara deskriptif. Total sesi pengukuran yaitu 12 kondisi x 30 replikasi x 2 perangkat = 720 sesi.
 Desain Eksperimen
-Variabel bebas yang digunakan dalam penelitian ini mencakup empat jenis delegate TensorFlow Lite, yaitu GPU Delegate, XNNPACK Delegate, dan CPU-only execution. Selain itu, digunakan varian model MoveNet, yakni Lightning (resolusi input 192×192 piksel), dan BlazePose Lite (Detector-tracker approach, 33 keypoints) serta dua jenis latihan, yaitu squat dan push-up, yang dipilih untuk merepresentasikan pola gerakan berbeda. Variabel terikat terdiri dari metrik performa (latensi inferensi, throughput, utilisasi CPU, penggunaan memori, dan konsumsi daya) serta metrik akurasi fungsional (Ketepatan Penghitungan Repetisi). Variabel kontrol meliputi perangkat yang digunakan, kondisi lingkungan, konfigurasi sistem, serta resolusi dan durasi video input agar setiap eksperimen berjalan dalam keadaan yang seragam.
-Berdasarkan rancangan ini, hipotesis penelitian diformulasikan sebagai berikut. Pertama, terdapat perbedaan signifikan dalam latensi inferensi antar delegate, dengan dugaan bahwa GPU Delegate memberikan latensi terendah, khususnya untuk model MoveNet Thunder.Ketiga, tidak terdapat perbedaan akurasi yang berarti antar delegate untuk model yang sama, menandakan bahwa optimasi delegate tidak memengaruhi hasil inferensi model. Keempat, performa relatif antar delegate diperkirakan konsisten pada kedua jenis latihan, yang menunjukkan generalisasi hasil penelitian terhadap berbagai pola gerakan.
-Tabel 3.1 Perancangan Eksperimen
-Faktor	Level	Keterangan
-Delegate	3	GPU, XNNPACK, CPU
-Model	2	MoveNet Lightning, BlazePose Lite
-Latihan	2	Squat, Push-up
-Total kombinasi = 3 delegate × 2 model × 2 latihan = 12 kondisi 
-Total runs = 12 kondisi × 30 replikasi = 360 eksperimen.
-Tahapan Penelitian
-Pelaksanaan penelitian ini dilakukan melalui beberapa tahap utama, yaitu tahap persiapan, pengembangan aplikasi uji, pengumpulan data, dan analisis hasil.
- 
-Pada tahap persiapan, dilakukan pemilihan perangkat keras dan perangkat lunak yang digunakan dalam eksperimen. Pengujian dilakukan menggunakan dua kategori perangkat, perangkat Low-range device, dan perangkat mid-range device. Untuk Low-range device menggunakan perangkat Samsung Galaxy A06 dengan prosesor Mediatek Helio G85, Ram 4 GB, dan sistem operasin android 14. Sedangkat mid-range device menggunakan perangkat Samsung Galaxy A33 dengan prosesor Exynos 1280, RAM 8 GB, dan sistem operasi Android 14. Kedua perangkat dipilih karena mendukung semua jenis delegate TensorFlow Lite yang diuji dan mewakili kategori yang umum digunakan pengguna Indonesia. Lingkungan pengujian dijaga konstan dengan suhu 24–26°C dan pencahayaan sekitar 500 lux. Aplikasi uji dikembangkan menggunakan Android Studio Iguana (2024.1.1) dengan bahasa Kotlin dan framework TensorFlow Lite versi 2.15.0.
-Tahap pengembangan aplikasi dilakukan dengan membangun sistem benchmarking yang berfungsi menjalankan kedua model pose estimation dalam berbagai konfigurasi delegate serta mencatat metrik performa secara otomatis. Aplikasi dirancang dengan arsitektur modular yang terdiri dari tiga lapisan: presentation layer untuk antarmuka dan kontrol pengujian, domain layer untuk logika perhitungan metrik dan validasi data, serta data layer untuk proses inferensi dan pencatatan hasil. Proses inferensi dijalankan menggunakan API TensorFlow Lite, sedangkan data metrik diperoleh melalui Android Profiler API dan TensorFlow Benchmark Tool.
-Tahap pengumpulan data dilakukan dengan menjalankan dua skenario latihan, yaitu squat dan push-up, menggunakan video masukan beresolusi 1080p dengan 30 FPS. Sebelum setiap sesi pengujian, perangkat di-restart untuk menghapus proses latar, dan dilakukan fase idle profiling selama 30 detik untuk mencatat baseline performa. Setiap konfigurasi delegate diuji secara bergantian dengan jeda lima menit untuk mencegah peningkatan suhu berlebih. Selama eksperimen, data performa dicatat secara real-time meliputi latensi inferensi, FPS, utilisasi CPU, memori, dan daya.
-Tahap analisis data diawali dengan proses pembersihan dan normalisasi data. Nilai outlier diidentifikasi menggunakan metode modified Z-score dengan ambang batas 3,5, sedangkan data yang hilang diinterpolasi secara linier. Selanjutnya, dilakukan normalisasi min–maks untuk penyamaan skala antar metrik dan transformasi logaritmik pada distribusi yang tidak normal. Setelah data siap, dilakukan analisis deskriptif untuk melihat kecenderungan umum dan sebaran data, dilanjutkan dengan analisis inferensial menggunakan ANOVA tiga arah dengan pengukuran berulang (three-way repeated-measures ANOVA) guna menguji pengaruh faktor delegate, model, dan jenis latihan beserta interaksinya.  Pemilihan desain repeated-measures ANOVA dibandingkan ANOVA independen dilakukan karena seluruh kondisi diuji pada perangkat yang sama, sehingga antar pengukuran bersifat dependen.
- Dengan demikian, pendekatan ini dapat mengurangi error variansi antar subjek dan meningkatkan sensitivitas pengujian statistik. Apabila ditemukan perbedaan signifikan, uji lanjut Tukey HSD dilakukan untuk mengetahui pasangan kelompok yang berbeda nyata, dengan tingkat signifikansi 5%. Selain itu, dilakukan analisis korelasi Pearson atau Spearman untuk menilai hubungan antar metrik performa seperti latensi, FPS, dan konsumsi daya.
-Metodologi Pengujian dan Analisis Statistik
-Penelitian ini menggunakan metodologi eksperimen kuantitatif dengan desain faktorial dimana variabel bebas adalah jenis delegate (3 level: GPU, XNNPACK, CPU) dan dua varian model yaitu Movenet Lightning dan BlazePose lite(Montgomery, 2017). Desain faktorial memungkinkan analisis efek interaksi antara variabel bebas terhadap variabel terikat.
-Eksperimen terkendali dilakukan dengan mengontrol variabel eksternal seperti suhu perangkat, proses latar belakang, level baterai, dan kondisi pencahayaan (Montgomery, 2017). Setiap kombinasi delegate-model diuji dengan beberapa kali pengulangan (minimal 30 iterasi) untuk memastikan validitas statistik.
-Pengujian white box dilakukan dengan menganalisis struktur internal aplikasi dan algoritme inferensi untuk memahami perilaku sistem secara detail (Myers dkk., 2011). Pendekatan ini melibatkan profiling kode, analisis call stack, dan pengukuran kinerja pada tingkat fungsi individual.
-Pengujian black box fokus pada evaluasi kinerja sistem dari perspektif pengguna akhir tanpa mempertimbangkan implementasi internal (Myers dkk., 2011). Metode ini mengukur metrik kinerja keseluruhan seperti latensi end-to-end, akurasi deteksi, dan responsivitas antarmuka pengguna.
-Analysis of Variance (ANOVA) digunakan untuk menguji signifikansi perbedaan rata-rata antar kelompok perlakuan (Field, 2018). Untuk penelitian ini, digunakan ANOVA dua arah untuk menganalisis efek utama dari jenis delegate dan varian model, serta efek interaksi antara keduanya.
-Asumsi ANOVA meliputi normalitas distribusi data, homogenitas varians, dan independensi observasi (Field, 2018). Uji Levene digunakan untuk menguji homogenitas varians, sementara uji Shapiro-Wilk digunakan untuk menguji normalitas distribusi data. Jika asumsi tidak terpenuhi, alternatif nonparametrik seperti uji Kruskal-Wallis akan digunakan.
-Uji Shapiro-Wilk merupakan uji statistik untuk menguji normalitas distribusi data dengan menghitung statistik W yang membandingkan data sampel dengan distribusi normal teoretis (Shapiro & Wilk, 1965). Nilai p < 0,05 mengindikasikan bahwa data tidak terdistribusi normal, sehingga diperlukan transformasi data atau penggunaan uji nonparametrik.
-Uji Shapiro-Wilk dipilih karena memiliki power yang tinggi untuk mendeteksi penyimpangan dari normalitas, terutama untuk ukuran sampel kecil hingga menengah (n < 50) (Field, 2018). Uji ini lebih sensitif dibanding uji normalitas lain seperti Kolmogorov-Smirnov, sehingga memberikan hasil yang lebih akurat untuk pengambilan keputusan statistik.
-Variabel Penelitian
-Penelitian ini menggunakan desain eksperiman faktorial untuk menganalisis pengaruh konfigurasi akselerasi perangkat keras terhadap kinerja komputasi aplikasi pose estimation. Variabel penelitian diklasifikasikan sebagai berikut: 
-	Variabel Bebas
-	Jenis Delegate: Terdiri dari tiga level metode akselerasi, yaitu GPU Delegate (akselerasi grafis), dan CPU XNNPACK (eksekusi standar teroptimasi).
-	Varian Model: Terdiri dari dua level yang merepresentasikan arsitektur berbeda, yaitu MoveNet Lightning (INT8) yang berbasis pendekatan heatmap ringan, dan MediaPipe BlazePose Lite (FP16) yang berbasis pendekatan detector-tracker topologi 33 keypoints.
-	Kategori Perangkat: Dibagi menjadi dua level untuk merepresentasikan segmentasi pasar, yaitu Low-End (Samsung Galaxy A06/A05) dan Mid-Range (Samsung Galaxy A33 5G).
-	Variabel Terikat
-	Latensi Inferensi: Waktu rata-rata yang dibutuhkan untuk memproses satu frame (satuan: milidetik/ms).
-	Throughput: Jumlah frame yang dapat diproses per detik (satuan: FPS).
-	Utilisasi Sumber Daya: Persentase penggunaan CPU (CPU Load) dan konsumsi memori dinamis (RAM dalam MB).
-	Konsumsi Daya: Estimasi energi yang digunakan selama proses inferensi (satuan: miliwatt/mW)
-	Variabel Kontrol
-	Input Video: Resolusi video masukan dikunci pada 1080p dengan framerate asli 30 FPS.
-	Kondisi Lingkungan: Suhu ruang dijaga stabil pada rentang 24–26°C untuk mencegah thermal throttling eksternal.
-	Kondisi Sistem: Mode pesawat (Airplane Mode) diaktifkan, kecerahan layar diatur pada 50%, dan seluruh aplikasi latar belakang (background processes) dimatikan sebelum pengujian. Baterai perangkat dipastikan berada pada level >50% dan tidak dalam kondisi pengisian daya (not charging) saat pengambilan data.
-Metode Eksperimen
-Penelitian ini menggunakan pendekatan within-subject repeated-measures design, di mana setiap kombinasi delegate, model, dan jenis latihan diuji pada perangkat yang sama dengan kondisi yang dikontrol secara ketat. Desain faktorial 3×2×2 menghasilkan 12 kondisi eksperimental, dan masing-masing kondisi dijalankan sebanyak 30 kali untuk memperoleh kekuatan statistik yang memadai. Sebelum eksperimen dimulai, perangkat di-restart untuk menstabilkan suhu dan menghapus proses latar, kemudian dilakukan verifikasi daya baterai dan pencahayaan ruangan agar sesuai dengan standar pengujian.
-Pelaksanaan eksperimen dilakukan melalui dua jenis latihan, yaitu squat dan push-up, yang dilakukan dengan tempo terstandar untuk menjaga konsistensi gerakan. Setiap sesi squat terdiri atas fase turun selama tiga detik, tahan satu detik, naik tiga detik, dan istirahat dua detik, sedangkan sesi push-up memiliki pola dua detik turun, satu detik tahan, dua detik naik, dan dua detik istirahat. Data dikumpulkan secara real-time menggunakan Android Profiler API untuk mencatat latensi inferensi, penggunaan CPU, konsumsi memori, serta konsumsi daya. Untuk menghindari bias akibat urutan pengujian, dilakukan proses counterbalancing pada urutan pengujian setiap delegate sehingga efek learning dan akumulasi panas dapat diminimalkan. Seluruh instrumen juga dikalibrasi, dan hasil pengamatan yang menyimpang diidentifikasi menggunakan modified Z-score dengan ambang 3,5 sebagai batas deteksi outlier.
-Statistik yang Digunakan
-Analisis data dilakukan secara kuantitatif menggunakan gabungan metode statistik deskriptif dan inferensial. Analisis deskriptif mencakup penghitungan nilai rata-rata, median, standar deviasi, varians, serta bentuk distribusi data seperti skewness dan kurtosis. Untuk setiap metrik performa, interval kepercayaan 95% dihitung menggunakan distribusi-t pada data berdistribusi normal, sedangkan data yang tidak normal diestimasi menggunakan metode bootstrap resampling.
-Uji normalitas dilakukan dengan uji Shapiro–Wilk pada taraf signifikansi 0,05 untuk memastikan bahwa data memenuhi asumsi parametrik. Apabila data tidak berdistribusi normal, dilakukan transformasi logaritmik atau akar kuadrat, dan jika masih belum memenuhi asumsi, digunakan alternatif non-parametrik. Homogenitas varians diuji dengan uji Levene atau Brown-Forsythe jika data tidak normal. Untuk menguji pengaruh dari faktor-faktor penelitian, digunakan three-way repeated-measures ANOVA guna menganalisis efek utama dari jenis delegate, varian model, dan jenis latihan, serta interaksi di antara ketiganya. Apabila uji ANOVA menunjukkan hasil yang signifikan, maka dilakukan uji lanjut Tukey HSD untuk membandingkan pasangan kelompok secara berpasangan dengan pengendalian tingkat kesalahan keluarga (family-wise error rate) pada α = 0,05. Ukuran efek dihitung menggunakan partial eta-squared (η²p) untuk menilai signifikansi praktis, dengan interpretasi efek kecil (η²p ≥ 0,01), sedang (≥ 0,06), dan besar (≥ 0,14). Apabila asumsi parametrik tidak terpenuhi, maka analisis digantikan dengan uji Friedman atau Kruskal-Wallis.
-  
+Desain eksperimen penelitian ini menggunakan rancangan faktorial penuh (full factorial design) dengan tiga faktor independen. Faktor pertama adalah jenis delegate (A) dengan tiga level: CPU Baseline, XNNPACK, dan GPU Delegate. Faktor kedua adalah varian model pose estimation (B) dengan dua level: Movenet Lightning dan BlazePose Lite. Faktor ketiga adalah jenis latihan (C) dengan dua level: squat dan push-up.
+Kombinasi seluruh faktor menghasilkan 12 kondisi eksperimental per perangkat. Desain faktorial penuh dipilih karena memungkinkan analisis efek interaksi antar-faktor, bukan hanya efek utama masing-masing faktor secara terpisah (Montgomery, 2017).
 
+Tabel 3.1 Rancangan Eksperimen Faktorial
+Faktor	Jumlah Level	Level	Keterangan
+Delegate (A)	3	CPU Baseline, XNNPACK, GPU	Metode akselerasi inferensi TFLite
+Model (B)	2	MoveNet Lightning, BlazePose Lite	Arsitektur model pose estimation
+Latihan (C)	2	Squat, Push-up	Jenis gerakan fisik yang dideteksi
+
+Total kombinasi = 3 x 2 x 2 = 12 kondisi per perangkat. Total sesi pengukuran = 12 kondisi x 30 replikasi x 2 perangkat = 720 sesi. Analisis ANOVA dijalankan sebagai dua set three-way ANOVA independen (Satu per perangkat) karena perbedaan arsitektur chipset antar perangkat menyebabkan ketidaksetaraan varians yang melanggar asumsi homogenitas apabila digabungkan.
+Variabel Penelitian
+Variabel Bebas
+a. Jenis Delegate (Faktor A). Terdiri dari tiga level metode akselerasi: (1) CPU Baseline — eksekusi menggunakan kernel bawaan TensorFlow Lite tanpa optimasi tambahan, dengan jumlah thread ditetapkan empat; (2) XNNPACK — eksekusi pada CPU dengan optimasi SIMD melalui instruksi ARM NEON untuk operasi aritmetika vektor; dan (3) GPU Delegate — eksekusi pada GPU perangkat menggunakan OpenGL ES atau OpenCL.
+b. Varian Model (Faktor B). Terdiri dari dua level: (1) MoveNet Lightning (FP16) — arsitektur bottom-up dengan resolusi masukan 192×192 piksel dan 17 keypoints standar COCO; dan (2) BlazePose Lite (FP16) — arsitektur detector-tracker dengan resolusi masukan 256×256 piksel dan 33 keypoints yang dipetakan ke 17 format COCO untuk konsistensi perbandingan.
+c. Jenis Latihan (Faktor C). Terdiri dari dua level: (1) Squat — gerakan vertikal yang berpusat pada sendi lutut; dan (2) Push-up — gerakan horizontal yang berpusat pada sendi siku. Keduanya dipilih karena merepresentasikan pola gerakan yang berbeda secara biomekanik.
+Variabel Terikat
+Empat variabel terikat utama diukur dan dianalisis menggunakan three-way ANOVA:
+
+Tabel 3.2 Variabel Terikat Utama
+No	Variabel	Satuan	Metode Pengukuran
+1	Latensi Inferensi	Milidetik (ms)	System.nanoTime() sebelum dan sesudah Interpreter.run()
+2	Throughput	Frame per second (FPS)	Penghitungan frame yang berhasil diproses per interval 1 detik
+3	Utilisasi CPU	Persen (%)	Pembacaan /proc/stat dan /proc/[pid]/stat per 100 ms
+4	Penggunaan Memori	Megabyte (MB)	Debug.MemoryInfo API — Proportional Set Size (PSS)
+
+Selain keempat variabel terikat utama, dua metrik tambahan dicatat namun tidak dimasukkan ke dalam analisis ANOVA. Pertama, konsumsi daya (mW) diestimasi menggunakan BatteryManager API dengan menghitung perkalian tegangan dan arus baterai. Metrik ini dilaporkan secara deskriptif karena granularitas sensor baterai pada perangkat low-to-mid range tidak memadai untuk sesi pengukuran berdurasi pendek, menghasilkan fluktuasi tinggi yang dapat menurunkan validitas uji statistik. Kedua, ketepatan penghitungan repetisi divalidasi secara terpisah sebagai uji fungsionalitas sistem dengan membandingkan jumlah repetisi yang terdeteksi oleh algoritma state machine terhadap hitungan manual (ground truth), dengan target akurasi minimum 90%.
+Variabel Kontrol
+Variabel kontrol ditetapkan untuk memastikan konsistensi kondisi antar sesi pengujian dan meminimalkan sumber variasi yang tidak relevan.
+Tabel 3.3 Variabel Kontrol
+Variabel Kontrol	Nilai/Kondisi	Justifikasi
+Mode Perangkat	Mode pesawat aktif	Menghilangkan gangguan jaringan dan proses sinkronisasi latar belakang
+Kecerahan Layar	50%	Menyeragamkan konsumsi daya layar antar sesi
+Aplikasi Latar Belakang	Seluruhnya ditutup	Mencegah kontaminasi penggunaan CPU dan memori
+Level Baterai	≥80%, tidak dalam pengisian	Menghindari mode hemat daya dan variabilitas arus pengisian
+Suhu Perangkat	<40°C sebelum setiap sesi	Mencegah thermal throttling yang menurunkan clock speed prosesor
+Suhu Ruang	24–26°C	Menjaga kondisi disipasi panas yang seragam antar sesi (Benoit-Cattin and Fernández-Berni, 2020)
+Pencahayaan	±500 lux	Memastikan kondisi deteksi kamera yang konsisten untuk pose estimation
+Sistem Operasi	Android 15 (API 35) — kedua perangkat	Menyeragamkan perilaku runtime dan API yang tersedia
+Warm-up Protocol	5 frame awal tidak dicatat	Menghindari pencilan akibat cold start GPU dan JIT compilation
+Versi TFLite	2.14.0	Memastikan perilaku delegate yang identik pada kedua perangkat
+Pengujian Fungsional pada End User
+Selain pengujian performa, penelitian ini juga melakukan pengujian fungsional terbatas pada end user. Pengujian ini bertujuan untuk memvalidasi bahwa aplikasi tidak hanya dapat menghasilkan data benchmark, tetapi juga mampu menjalankan fungsi dasar aplikasi kebugaran, yaitu mendeteksi pose dan menghitung repetisi squat serta push-up secara otomatis.
+
+             Pengujian dilakukan pada 5 subjek. Setiap subjek diminta melakukan 1 set squat sebanyak 10 repetisi dan 1 set push-up sebanyak 10 repetisi. Konfigurasi model dan delegate yang digunakan pada pengujian ini adalah konfigurasi terbaik berdasarkan hasil pengujian performa. Hasil pengujian dibandingkan dengan hitungan manual sebagai ground truth. Metrik yang digunakan adalah akurasi penghitungan repetisi, yang dihitung dengan rumus:
+
+Akurasi (%) = (jumlah repetisi terdeteksi benar / jumlah repetisi aktual) × 100%
+
+             Pengujian ini tidak dimasukkan ke dalam analisis ANOVA, melainkan dilaporkan menggunakan statistik deskriptif berupa akurasi per subjek dan rata-rata akurasi per jenis latihan.
+Tahap Persiapan
+ 
+Gambar 3.1 Tahapan Alur Penelitian
+
+Pada tahap persiapan, dilakukan pemilihan dan konfigurasi perangkat keras serta perangkat lunak yang digunakan dala eksperimen. Dua perangkat uji dipilih untuk merepresentasikan segmentasi pasar Android Indonesia, dengan spesifikasi yang disajikan pada Tabel 3.4.
+Tabel 3.4 Spesifikasi Perangkat Uji
+Spesifikasi	Samsung Galaxy A06 (Low-end)	Samsung Galaxy A33 5G (Mid-range)
+Chipset	MediaTek Helio G85	Samsung Exynos 1280
+CPU	2×2,0 GHz Cortex-A75 + 6×1,8 GHz Cortex-A55	2×2,4 GHz Cortex-A78 + 6×2,0 GHz Cortex-A55
+GPU	Mali-G52 MC2	Mali-G68
+RAM	4 GB	6/8 GB
+Sistem Operasi	Android 15 (API 35)	Android 15 (API 35)
+Segmen Pasar	Entry-level (<Rp. 1 Juta)	Mid-range (Rp. 3-5 Juta)
+
+Kedua perangkat dipilih karena mendukung seluruh konfigurasi delegate TensorFlow Lite yang diuji dan merepresentasikan segmen yang paling dominan di pasar Indonesia (IDC, 2023). Lingkungan pengujian dijaga pada suhu 24–26°C dengan pencahayaan sekitar 500 lux. Aplikasi test harness dikembangkan menggunakan Android Studio Iguana (2024.1.1) dengan bahasa Kotlin dan pustaka TensorFlow Lite versi 2.14.0.
+Tahap Pengembangan Aplikasi
+Tahap pengembangan dilakukan dengan membangun sistem benchmarking yang mampu menjalankan kedua model pose estimation dalam berbagai konfigurasi delegate serta mencatat metrik performa secara otomatis. Aplikasi dirancang dengan arsitektur berlapis mengikuti pola MVVM (Model-View-ViewModel): Presentation Layer untuk antarmuka dan kontrol pengujian, Domain Layer untuk logika penghitungan repetisi dan orkestrasi benchmarking, serta Data Layer untuk proses inferensi TFLite, profiling sumber daya, dan pencatatan data.
+Pergantian model dan delegate difasilitasi secara dinamis menggunakan Strategy Pattern melalui antarmuka PoseDetector. Pra-pemrosesan citra menggunakan teknik letterbox padding untuk menjaga rasio aspek masukan kamera. Protokol warm-up 5 frame diterapkan sebelum pencatatan data dimulai untuk menghindari pencilan akibat cold start GPU dan JIT compilation. Detail perancangan dan implementasi diuraikan pada Bab 4 dan Bab 5.
+Tahap Pengumpulan Data
+Pengumpulan data dilakukan dengan menjalankan dua skenario latihan — squat dan push-up — secara langsung di depan kamera perangkat uji (live camera feed). Subjek melakukan gerakan dengan tempo terstandar untuk menjaga konsistensi antar sesi: setiap sesi squat menggunakan pola 3 detik turun, 1 detik tahan, 3 detik naik, dan 2 detik istirahat; sedangkan sesi push-up menggunakan pola 2 detik turun, 1 detik tahan, 2 detik naik, dan 2 detik istirahat.
+Setiap replikasi mengikuti protokol berikut secara ketat:
+No	Langkah Protokol
+1	Perangkat di-restart sebelum rangkaian pengujian dimulai untuk menghapus proses latar belakang dan menstabilkan suhu
+2	Mode pesawat diaktifkan, kecerahan layar 50%, seluruh aplikasi latar belakang ditutup
+3	Suhu perangkat dipastikan di bawah 40°C sebelum setiap sesi
+4	Baterai dipastikan terisi minimal 80% dan tidak dalam kondisi pengisian daya
+5	Konfigurasi delegate dan model dipilih melalui panel kontrol aplikasi
+6	Interpreter TFLite diinisialisasi ulang dengan konfigurasi terpilih
+7	5 frame pertama (fase warm-up) dijalankan tanpa pencatatan data
+8	Subjek melakukan gerakan latihan di depan kamera; sistem mencatat metrik untuk minimal 300 frame inferensi stabil
+9	Data diekspor ke berkas CSV; perangkat diberi jeda pendinginan sebelum sesi berikutnya
+
+Untuk menghindari bias urutan pengujian, dilakukan counterbalancing pada urutan konfigurasi delegate dalam satu rangkaian sesi. Seluruh 12 kondisi pada satu perangkat diselesaikan sebelum berpindah ke perangkat lainnya. Seluruh metrik performa dicatat secara real-time dan diekspor ke format CSV untuk analisis lanjutan.
+Tahap Analisis Data
+Tahap analisis data diawali dengan pemeriksaan kualitas data. Pencilan diidentifikasi menggunakan modified Z-score dengan ambang batas 3,5. Pencilan yang teridentifikasi sebagai artefak prosedural (misalnya akibat thermal throttling yang tidak terkontrol) dihapus dari dataset, sedangkan pencilan yang merupakan variasi alami dipertahankan. Data yang hilang diinterpolasi secara linier apabila jumlahnya tidak melebihi 5% dari total observasi per kondisi.
+Selanjutnya dilakukan analisis deskriptif berupa penghitungan rata-rata (μ), simpangan baku (σ), nilai minimum, dan nilai maksimum untuk setiap variabel terikat pada setiap kondisi. Analisis inferensial menggunakan three-way repeated-measures ANOVA untuk menguji pengaruh faktor Delegate (A), Model (B), dan Jenis Latihan (C) beserta seluruh efek interaksinya. Detail prosedur statistik diuraikan pada Subbab 3.5.
+Metodologi Analisis Statistik
+Uji Asumsi
+Sebelum ANOVA dijalankan, dua asumsi fundamental diuji untuk setiap variabel terikat pada setiap kondisi.
+Normalitas diuji menggunakan uji Shapiro-Wilk karena ukuran sampel per kelompok relatif kecil (n = 30) dan uji ini memiliki statistical power yang baik untuk mendeteksi penyimpangan dari normalitas pada ukuran sampel kecil hingga menengah (Field, 2018). Hipotesis nol menyatakan data berdistribusi normal. Apabila asumsi tidak terpenuhi (p < 0,05), dilakukan transformasi logaritmik. Jika setelah transformasi asumsi masih tidak terpenuhi, analisis digantikan dengan uji Friedman atau Kruskal-Wallis sebagai alternatif nonparametrik.
+Homogenitas varians diuji menggunakan uji Levene karena lebih robust terhadap pelanggaran normalitas dibandingkan uji Bartlett. Hipotesis nol menyatakan varians antar kelompok homogen pada α = 0,05.
+Three-Way Repeated-Measures ANOVA
+Three-way repeated-measures ANOVA digunakan untuk menguji pengaruh tiga faktor — Delegate (A, 3 level), Model (B, 2 level), dan Jenis Latihan (C, 2 level) terhadap masing-masing variabel terikat. Desain repeated-measures dipilih karena seluruh kondisi diuji pada perangkat yang sama, sehingga pengukuran antar kondisi bersifat dependen. Pendekatan ini mengurangi variasi antar-subjek dan meningkatkan sensitivitas statistik (Field, 2018). Analisis menguji tujuh sumber variasi: tiga efek utama (A, B, C), tiga efek interaksi dua arah (A×B, A×C, B×C), dan satu efek interaksi tiga arah (A×B×C). Tingkat signifikansi ditetapkan pada α = 0,05.
+Model statistik three-way ANOVA diformulasikan sebagai: 
+Y_ijk= μ + α_i+ β_j+ γ_k+ (αβ)_ij+ (αγ)_ik+ (βγ)_jk+ (αβγ)_ijk+ ε_ijk (3.1)
+di mana Y_ijk adalah nilai variabel terikat, μ adalah rata-rata keseluruhan, α_i adalah efek faktor Delegate, β_j adalah efek faktor Model, γ_k adalah efek faktor Jenis Latihan, dan ε_ijk adalah galat acak (Montgomery, 2017).
+Ukuran efek dihitung menggunakan partial eta-squared (η²p) untuk menilai signifikansi praktis, dengan interpretasi: efek kecil (η²p ≥ 0,01), efek sedang (η²p ≥ 0,06), dan efek besar (η²p ≥ 0,14) (Cohen, 1988; Field, 2018). ANOVA dijalankan secara terpisah untuk setiap variabel terikat pada masing-masing perangkat.
+Uji Post-hoc Tukey HSD
+Apabila ANOVA menunjukkan efek utama yang signifikan pada faktor Delegate (yang memiliki tiga level), uji lanjut Tukey Honestly Significant Difference (HSD) dilakukan untuk mengidentifikasi pasangan level mana yang berbeda secara signifikan. Tukey HSD dipilih karena mampu mengendalikan family-wise error rate pada α = 0,05 saat melakukan perbandingan berpasangan ganda. Faktor Model dan Jenis Latihan tidak memerlukan uji post-hoc karena masing-masing hanya memiliki dua level, sehingga perbedaannya sudah cukup jelas dari nilai F dan arah rata-rata pada ANOVA.
+Analisis Trade-off Deskriptif
+Untuk menjawab rumusan masalah ketiga mengenai konfigurasi yang memberikan keseimbangan optimal, dilakukan analisis trade-off secara deskriptif berdasarkan interpretasi gabungan dari hasil ANOVA dan statistik deskriptif. Setiap konfigurasi dievaluasi berdasarkan tiga kriteria: (1) kelayakan real-time — FPS ≥30 ideal, ≥25 acceptable, ≥15 minimum untuk aplikasi kebugaran; (2) efisiensi sumber daya — utilisasi CPU dan konsumsi memori; dan (3) trade-off antar-metrik secara keseluruhan. Rekomendasi disusun berdasarkan skenario penggunaan yang berbeda, mengingat bahwa tidak ada satu konfigurasi yang optimal untuk semua kondisi.
+Matriks Kondisi Eksperimen
+Tabel 3.5 menyajikan seluruh 12 kondisi eksperimental beserta jumlah replikasi yang akan dilaksanakan pada setiap perangkat uji.
+
+Tabel 3.5 Matriks Kondisi Eksperimen
+No	Model	Delegate	Latihan	Replikasi
+1	MoveNet Lightning	CPU Baseline	Squat	30
+2	MoveNet Lightning	CPU Baseline	Push-up	30
+3	MoveNet Lightning	XNNPACK	Squat	30
+4	MoveNet Lightning	XNNPACK	Push-up	30
+5	MoveNet Lightning	GPU Delegate	Squat	30
+6	MoveNet Lightning	GPU Delegate	Push-up	30
+7	BlazePose Lite	CPU Baseline	Squat	30
+8	BlazePose Lite	CPU Baseline	Push-up	30
+9	BlazePose Lite	XNNPACK	Squat	30
+10	BlazePose Lite	XNNPACK	Push-up	30
+11	BlazePose Lite	GPU Delegate	Squat	30
+12	BlazePose Lite	GPU Delegate	Push-up	30
+Total				360 per perangkat / 720 total
+
+Instrumen dan Alat Penelitian
+Tabel 3.6 merangkum seluruh perangkat lunak dan pustaka yang digunakan dalam penelitian ini.
+Komponen	Versi/Spesifikasi	Fungsi
+Android Studio	Iguana 2024.1.1	IDE pengembangan aplikasi Android
+Kotlin	1.9.x	Bahasa pemrograman utama
+TensorFlow Lite	2.14.0	Runtime inferensi model ML on-device
+tensorflow-lite-gpu	2.14.0	Pustaka GPU Delegate
+tensorflow-lite-support	0.4.4	Utilitas pra-pemrosesan citra
+CameraX	1.3.x	API kamera Android untuk live feed
+Model MoveNet Lightning	FP16, 192×192 px	Model pose estimation ringan
+Model BlazePose Lite	FP16, 256×256 px	Model pose estimation 33 keypoints
+Python + SciPy/Pingouin	3.10+	Analisis statistik ANOVA pasca pengumpulan data
 PERANCANGAN SISTEM
-Bab ini membahas perancangan perangkat lunak yang dibangun sebagai alat ukur (test harness) untuk eksperimen. Perancangan meliputi analisis kebutuhan, arsitektur sistem, algoritma inferensi, dan desain antarmuka pengguna. 
+Bab ini membahas perancangan perangkat lunak yang dibangun sebagai alat ukur (test harness) untuk eksperimen benchmarking. Perancangan meliputi analisis kebutuhan, arsitektur dan diagram perancangan, algoritma inferensi, desain antarmuka, dan strategi pengukurna metrik. Seluruh keputusan perancangan diarahkan untuk menghasilkan alat ukur yang valid, reproducible, dan memiliki bias pengukuran minimal.
 Analisis Kebutuhan Sistem
-Tahap ini mendefinisikan spesifikasi kebutuhan aplikasi benchmarking untuk memastikan alat ukur dapat mengambil data eksperimen secara valid sesuai variabel penelitian. Sistem harus mampu mengeksekusi eksperimen dengan repeatability tinggi dan bias minimal untuk menghasilkan data valid secara statistik.
-Kebutuhan Fungsional
-Kebutuhan fungsional mendefinisikan kemampuan-kemampuan yang harus dimiliki aplikasi benchmarking. Aplikasi harus mampu memuat model pose estimation (MoveNet Lightning dan BlazePose Lite) dari folder asset ke memori dan menginisialisasi interpreter dengan konfigurasi delegate yang dipilih.
-Tabel 4.1 Kebutuhan Fungsional Aplikasi Benchmarking
-Kategori	Fungsi Utama
-Manajemen Delegate	Sistem harus mampu mengubah konfigurasi akselerasi perangkat keras (delegate) yang meliputi CPU, XNNPACK, dan GPU secara dinamis (runtime) tanpa memerlukan kompilasi ulang aplikasi.
-Manajemen Model	Sistem harus memfasilitasi pemuatan dan eksekusi inferensi menggunakan dua varian model yang diuji: MoveNet Lightning (INT8) dan BlazePose Lite (FP16).
-Pengukuran Latensi Real-Time	Sistem harus mampu menghitung waktu eksekusi inferensi (inference time) dalam satuan milidetik (ms) untuk setiap frame yang diproses.
-Perhitungan Repetisi	Sistem harus memiliki logika geometri untuk mendeteksi gerakan squat dan push-up berdasarkan koordinat keypoints tubuh manusia.
-Pencatatan Data Otomatis	Sistem harus dapat menyimpan data metrik performa (Latensi, FPS, CPU Load) ke dalam format log (CSV) untuk keperluan analisis statistik lebih lanjut.
+Tahap analisis kebutuhan mendefinisikan spesifikasi aplikasi benchmarking agar alat ukur dapat mengumpulkan data eksperimen secara vaid sesuai variabel penelitian yang telah ditetapkan pada Bab 3. Sistem harus mampu mengeksekusi eksperimen dengan repeatability tinggi dan bias minimal untuk menghasilkan data yang valid secara statistik.
+Identifikasi Aktor Sistem
+Karena aplikasi ini merupakan test harness yang dioperasikan langsung oleh peneliti, terdapat satu aktor utama dan satu aktor sistem pendukung.
+Tabel 4.1 Identifikasi Aktor Sistem
+No	Aktor	Tipe	Deskripsi
+1	Peneliti	Primary	Pengguna utama yang mengonfigurasi parameter eksperimen (model, delegate, jenis latihan), memulai/menghentikan sesi benchmarking, memantau metrik real-time, dan mengekspor data hasil pengujian ke format CSV.
+
+Hanya ada satu aktor yaitu aktor Peneliti, merepresentasikan pengguna yang menjalankan eksperimen secara langsung pada perangkat uji.
+Kebutuhan Fungsional 
+Kebutuhan fungsional mendefinisikan kemampuan utama yang harus dimiliki apliaksi benchmarking. Tabel 4.2 merangkum kebutuhan fungsional beserta justifikasi teknis masing-masing.
+Tabel 4.2 Kebutuhan Fungsional Aplikasi Benchmarking
+Kode	Kategori	Deskripsi Kebutuhan
+KF-01	Manajemen Delegate	Sistem harus mampu mengubah konfigurasi delegate (CPU Baseline, XNNPACK, GPU) secara dinamis pada runtime tanpa memerlukan kompilasi ulang aplikasi.
+KF-02	Manajemen Model	Sistem harus memfasilitasi pemuatan dan eksekusi inferensi menggunakan dua model: MoveNet Lightning (FP16) dan BlazePose Lite (FP16).
+KF-03	Pengukuran Latensi	Sistem harus mengukur waktu eksekusi inferensi (inference time) dalam milidetik untuk setiap frame menggunakan System.nanoTime().
+KF-04	Perhitungan Repetisi	Sistem harus memiliki logika geometri untuk mendeteksi gerakan squat dan push-up berdasarkan sudut sendi keypoints tubuh dengan state machine hysteresis.
+KF-05	Pencatatan Data Otomatis	Sistem harus menyimpan data metrik performa (latensi, FPS, utilisasi CPU, penggunaan memori, estimasi daya) ke format CSV per-frame untuk analisis statistik.
+KF-06	Ekspor CSV	Sistem harus mengekspor data benchmarking yang tersimpan ke file CSV pada penyimpanan perangkat menggunakan MediaStore API.
 
 Kebutuhan Non-Fungsional
-	Kompatibilitas: Aplikasi harus dapat berjalan pada sistem operasi Android dengan target SDK API Level 34 (Android 14) namun tetap kompatibel dengan perangkat legacy.
-	Framework: Sistem dikembangkan menggunakan library TensorFlow Lite versi 2.15.0.
-	Efisiensi UI: Beban rendering antarmuka tidak boleh mengganggu pengukuran kinerja backend TFLite.
-	Stabilitas: Aplikasi harus menangani pengecualian (exception handling) saat inisialisasi GPU gagal pada perangkat yang tidak kompatibel.
+Kebutuhan non-fungsional mendfinisikan batasan teknis dan kualitas sistem yang harus dipenuhi agar eksperimen dapat berjalan dengan valid.
+Tabel 4.3 Kebutuhan Non-Fungsional Aplikasi Benchmarking
+Aspek	Kebutuhan
+Kompatibilitas	Aplikasi harus berjalan pada Android API Level 35 (Android 15) dan kompatibel dengan kedua perangkat uji (Samsung Galaxy A06 dan A33 5G).
+Framework	Sistem dikembangkan menggunakan TensorFlow Lite versi 2.14.0.
+Efisiensi UI	Beban rendering antarmuka tidak boleh mengganggu pengukuran kinerja backend TFLite. UI diimplementasikan dengan Jetpack Compose yang ringan.
+Stabilitas	Aplikasi harus menangani kegagalan inisialisasi GPU (fallback ke XNNPACK) tanpa crash dan tanpa membatalkan sesi eksperimen yang sedang berjalan.
+Reproducibility	Protokol warm-up 5 frame dan counterbalancing urutan delegate harus dapat dieksekusi secara konsisten pada setiap sesi pengujian.
+
+Use Case 
+Use Case Diagram
+Diagram use case menggambarkan interaksi antara aktor Peneliti dengan fungsi-fungsi utama sistem. Terdapat enam use case yang merepresentasikan kebutuhan fungsional yang telah diidentifikasi.
+ 
+Gambar 4.1 Use Case Diagram Aplikasi Benchmarking
+Use case utama terdiri dari: (UC-01) Mengonfigurasi Parameter Eksperimen, (UC-02) Menjalankan Inferensi Real-time, (UC-03) Menghitung Repetisi Latihan, (UC-04) Memantau Metrik Performa, (UC-05) Merekam Data Benchmarking, dan (UC-06) Mengekspor Data ke CSV. UC-03 memiliki relasi include terhadap UC-02 karena penghitungan repetisi memerlukan hasil inferensi pose. UC-05 memiliki relasi include terhadap UC-04 karena proses perekaman mencatat metrik yang sedang dipantau.
+Spesifikasi Use Case
+UC-01: Mengonfigurasi Parameter Eksperimen
+Tabel 4.4 Use Case Scenario Mengonfigurasi Parameter Eksperimen
+Use Case ID	UC-01
+Nama	Mengonfigurasi Parameter Eksperimen
+Aktor	Peneliti
+Include	UC-02, UC-03, UC-04
+Deskripsi	Peneliti memilih kombinasi model pose estimation, delegate akselerasi, dan jenis latihan yang akan diuji sebelum atau selama sesi benchmarking berlangsung.
+Pre-condition	1. Aplikasi telah terbuka dan izin kamera telah diberikan.
+2. Layar utama (CameraScreen) ditampilkan.
+Post-condition	1. Interpreter TFLite diinisialisasi ulang dengan konfigurasi baru.
+2. Preview kamera menampilkan overlay pose sesuai model terpilih.
+3. Fase warm-up (5 frame) dijalankan sebelum metrik dicatat.
+Main Flow	1. Peneliti membuka panel kontrol di bagian bawah layar.
+2. Peneliti memilih model dari dropdown (MoveNet Lightning / BlazePose Lite).
+3. Peneliti memilih delegate dari dropdown (CPU Baseline / XNNPACK / GPU).
+4. Peneliti memilih jenis latihan dari dropdown (Squat / Push-up / None).
+5. Sistem melepaskan interpreter lama dan menginisialisasi interpreter baru.
+6. Sistem menjalankan warm-up 5 frame tanpa pencatatan metrik.
+7. Sistem menampilkan overlay skeleton pose pada preview kamera.
+Alternative Flow	5a. Jika inisialisasi GPU gagal:
+5a.1. Sistem menampilkan peringatan "GPU tidak didukung, fallback ke XNNPACK".
+5a.2. Sistem otomatis menginisialisasi interpreter dengan delegate XNNPACK.
+5a.3. Dropdown delegate diperbarui ke XNNPACK.
+Exception Flow	5b. Jika pemuatan model gagal (file .tflite corrupt/tidak ditemukan):
+5b.1. Sistem menampilkan pesan error "Model gagal dimuat".
+5b.2. Inferensi tidak berjalan hingga konfigurasi diperbaiki.
+
+
+
+Tabel 4.5 Use Case Scenario Memilih Model Pose Estimation
+Use Case ID	UC-02
+Nama	Memilih Model Pose Estimation
+Aktor	Peneliti
+Deskripsi	Peneliti memilih varian model pose estimation yang akan digunakan untuk sesi pengujian.
+Pre-condition	1. Panel kontrol ditampilkan (dipanggil dari UC-01).
+Post-condition	1. Koordinat keypoints (17 format COCO) tersedia untuk setiap frame.
+2. Latensi inferensi per-frame terukur dalam milidetik.
+3. Overlay skeleton ditampilkan pada preview kamera.
+Main Flow		Sistem menampilkan dropdown dengan dua opsi: MoveNet Lightning (FP16) dan BlazePose Lite (FP16)
+	Peneliti memilih salah satu model
+	Sistem menyimpan variabel ke activeModel
+Alternative Flow		
+
+Tabel 4.6 Use Case Scenario Memilih Delegate
+Use Case ID	UC-02
+Nama	Memilih Delegate
+Aktor	Peneliti
+Deskripsi	Peneliti memilih konfigurasi akselerasi perangkat keras yang akan digunakan untuk inferensi.
+Pre-condition	1. Panel kontrol ditampilkan (dipanggil dari UC-10).
+Post-condition	1. Variabel activeDelegate diperbarui sesuai pilihan.
+Main Flow		Sistem menampilkan dropdown dengan tiga CPU Baseline, XNNPACK, GPU Delegate.
+	Peneliti memilih salah satu delegate
+	Sistem menyimpan pilihan ke variabel activeDelegate.
+Alternative Flow	2a. Jika perangkat tidak mendukung GPU: opsi GPU Delegate ditampilkan dengan tanda peringatan.
+
+Tabel 4.7 Use Case Scenario Memilih Jenis Latihan
+Use Case ID	UC-04
+Nama	Memilih Jenis Latihan
+Aktor	Peneliti
+Deskripsi	Peneliti memilih jenis gerakan latihan yang akan dideteksi dan dihitung repetisinya.
+Pre-condition	Panel kontrol ditampilkan (dipanggil dari UC-01)
+
+Post-condition	State machine repetisi direset dan dikonfigurasi sesuai jenis latihan yang dipilih.
+Main Flow		Sistem menampilkan dropdown dengan tiga opsi: Squat, Push-up, None.
+	Peneliti memilih salah satu jenis latihan
+	Sistem mereset counter repetisi dan menginisialisasi state machine sesuai pilihan
+Alternative Flow	2a. Jika None dipilih: state machine dinonaktifkan, counter tidak ditampilkan.
+
+
+
+
+Tabel 4.8 Use Case Scenario Menjalankan Benchmark
+Use Case ID	UC-05
+Nama	Menjalankan Benchmark
+Aktor	Peneliti
+Include	UC-06, UC-07
+Extend	UC-08
+Deskripsi	Sistem menjalankan loop inferensi real-time secara kontinu, memproses setiap frame dari kamera, dan menampilkan hasil deteksi pose beserta metrik performa.
+Pre-condition	UC-01 telah selesai dieksekusi dan interpreter TFLite aktif.
+Post-condition	1. Loop inferensi berjalann kontinu hingga peneliti menghentikan atau mengubah konfigurasi.
+Main Flow		CameraX imageAnalyzer menerima frame baru dari sensor kamera
+	Sistem memproses frame (UC-06) 
+	Sistem menampilkan overlay skeleton dan metrik pada UI
+	Loop kembali ke langkah 1 untuk frame berikutnya
+Alternative Flow	1a. Jika frame kosong atau format tidak didukung: frame diskip tanpa pencatatan, loop berlanjut.
+
+Tabel 4.9 Use Case Scenario Memproses Frame Kamera
+Use Case ID	UC-06
+Nama	Memproses Frame Kamera
+Aktor		(dipanggil dari UC-05)
+Deskripsi	Sistem melakukan pra-pemrosesan frame, menjalankan inferensi TFLite, dan memparsing output keypoints.
+Pre-condition	1. Interpreter TFLite aktif dan frame tersedia.
+Post-condition	1. Koordinat keypoints tersedia dan latensi inferensi terukur dalam milidetik.
+Main Flow		Sistem mengonversi ImageProxy ke Bitmap 
+	Sistem menerapkan letterbox padding untuk menjaga rasio aspek
+	Sistem melakukan normalisasi piksel sesuai spesifikasi model
+	Sistem mencatat StartTime menggunakan System.nanoTime()
+	Sistem menjalankan Interpreter.run()
+	Sistem mencatat endTime dan menghitung latensi
+	Sistem mem-parsing output tensor menjadi keypoints
+	Sistem mengoreksi korrdinasi dari ruang letterbox ke ruang kamera.
+Alternative Flow	7a. Untuk model BlazePose: parsing menghasilkan 33 keypoints, kemudian dipetakan ke 17 keypoints COCO + EMA smoothing (α=0.4)
+7b. Jika rata-rata confidence keypoints < 0.3: sistem mengembalikan null, frame diskip untuk deteksi repetisi.
+
 Perancangan Arsitektur Sistem
-Arsitektur aplikasi mengikuti pendekatan berlapis untuk memisahkan concerns antara presentasi, logika bisnis, dan akses data. Pemisahan ini memudahkan testing, maintenance, dan perubahan teknologi tanpa mempengaruhi lapisan lain.
-Diagram Arsitektur (3-Layer Architecture) 
+Arsitektur dirancang menggunakan pendekatan berlapis untuk memisahkan tanggung jawab antara antarmuka pengguna, logika eksperimen, dan akses terhadap komponen inferensi serta pencatatan data. Pemisahan ini bertujuan agar perubahan pada model pose estimation, delegate TensorFlow Lite, maupun mekanisme pencatatan metrik tidak memengaruhi keseluruhan sistem secara langsung.
+Diagram Arsitektur Sistem (3-Layer Architecture)
 Sistem menerapkan arsitektur bertingkat (multi-layer) dengan pola MVVM (Model-View-ViewModel) untuk menjaga reaktivitas antarmuka terhadap perubahan data metrik performa secara real-time.
  
-Gambar  4.1 Diagram Arsitektur Sistem
+Gambar 4.2 Diagram Arsitektur Sistem
+Arsitektur sistem dibagi menjadi tiga lapisan utama, yaitu Presentation Layer, Domain Layer, dan Data Layer. Presentation Layer bertanggung jawab terhadap interaksi pengguna, tampilan kamera, overlay pose, serta panel metrik real-time. Domain Layer berisi logika utama eksperimen, seperti pengaturan alur benchmarking, perhitungan repetisi, dan perhitungan metrik performa. Data Layer menangani interaksi dengan komponen teknis, seperti CameraX, TensorFlow Lite Interpreter, delegate, profiler sumber daya, logger, dan ekspor data CSV.
 
+Tabel 4.10 Tabel Penjelasan Arsitektur Sistem
+Layer	Komponen	Tanggung Jawab
+Presentation Layer	
+CameraScreen, PoseOverlay, MetricsPanel
+	Menampilkan kamera, skeleton pose, konfigurasi, dan metrik real-time
+Domain Layer	BenchmarkController, RepetitionCounter, MetricsCalculator	Mengatur alur benchmark, menghitung repetisi, dan mengolah metrik
+Data Layer	TFLitePoseDetector, DelegateManager, ResourceProfiler, BenchmarkLogger, CsvExporter	Menjalankan inferensi, memilih delegate, membaca resource, mencatat data, dan ekspor CSV
+External System	CameraX, TensorFlow Lite Runtime, Android Storage	Menyediakan frame kamera, runtime inferensi, dan penyimpanan file
 
-Arsitektur ini menerapkan pola MVVM (Model-View-ViewModel) untuk menjaga reaktivitas antarmuka terhadap perubahan data metrik performa secara real-time.
-	Presentation Layer: Bertanggung jawab menampilkan preview kamera dan overlay hasil deteksi pose kepada pengguna.
-	Domain Layer: Berisi logika inti, termasuk algoritma penghitungan repetisi dan orkestrasi proses benchmarking.
-	Data Layer: Menangani interaksi langsung dengan API TensorFlow Lite, inisialisasi delegate, dan alat profiling.
-Diagram Alir Data (Data Flow) Diagram berikut menjelaskan aliran data citra dari kamera hingga menjadi data metrik.
+Class Diagram
  
-Gambar  4.2 Diagram Alir Data Inferensi
-Diagram Sekuens
-Perancangan Algoritma (Flowchart)
-Bagian ini menjelaskan logika prosedural untuk proses inferensi dan validasi fungsional (penghitungan repetisi).
-Flowchart Alur Inferensi. Proses inferensi dirancang untuk mengukur latensi secara presisi menggunakan penanda waktu (timestamp).
+Gambar 4.3 Class Diagram
+	Berdasarkan Gambar 4.4 rancangan kelas aplikasi AccelPose dibagi menjadi empat kelompok utama, yaitu Presentation Layer, Domain Layer, Data Layer, dan Model. Pembagian ini dilakukan agar setiap bagian sistem memiliki tanggung jawab yang jelas. Presentation Layer berfokus pada tampilan dan interaksi pengguna, Domain Layer berisi logika utama aplikasi, Data Layer menangani proses teknis seperti inferensi dan pencatatan data, sedangkan Model berisi struktur data yang digunakan oleh seluruh lapisan sistem. Pembagian ini sejalan dengan prinsip arsitektur aplikasi Android, yaitu UI layer berperan menampilkan data aplikasi dan menerima input pengguna, sedangkan domain layer digunakan untuk menampung logika bisnis yang kompleks atau dapat digunakan ulang.
+	Presentation Layer terdiri atas kelas MainActivity, CameraScreen, PoseVisualization, dan PoseImageAnalyzer. MainActivity berperan sebagai entry point aplikasi serta menangani pemeriksaan izin kamera sebelum halaman utama ditampilkan. CameraScreen merupakan komponen antarmuka utama yang menampilkan preview kamera, panel konfigurasi model, pilihan delegate, pilihan jenis latihan, serta metrik real-time. PoseVisualization bertanggung jawab menggambar skeleton pose berdasarkan keypoints yang dihasilkan dari proses inferensi. Sementara itu, PoseImageAnalyzer berperan sebagai penghubung antara frame kamera dan proses analisis pose, yaitu menerima frame dari CameraX, melakukan pemrosesan awal, lalu meneruskan frame tersebut ke komponen deteksi pose.
+Domain Layer berisi kelas dan interface yang menangani logika utama aplikasi. PoseViewModel menjadi komponen pusat yang mengelola state aplikasi, konfigurasi model, konfigurasi delegate, jenis latihan, hasil pose, metrik performa, dan status logging. Meskipun PoseViewModel menjadi penghubung utama antara antarmuka dan komponen lain, logika khusus tetap dipisahkan ke kelas yang lebih spesifik agar tanggung jawab setiap kelas tidak bercampur. Interface PoseDetector digunakan untuk menyeragamkan mekanisme deteksi pose, sehingga aplikasi dapat menggunakan MoveNetDetector atau BlazePoseDetector tanpa mengubah alur utama sistem. Interface ExerciseDetector digunakan untuk menyeragamkan mekanisme analisis latihan, sedangkan SquatDetector dan PushUpDetector menjadi implementasi khusus untuk masing-masing gerakan. Selain itu, AngleCalculator digunakan sebagai komponen bantu untuk menghitung sudut sendi berdasarkan keypoints tubuh.
+Data Layer berisi komponen yang berhubungan dengan proses teknis sistem. MoveNetDetector dan BlazePoseDetector merupakan implementasi dari PoseDetector yang menjalankan model pose estimation sesuai pilihan pengguna. Kedua detector tersebut menggunakan TFLiteHelper untuk memuat model dan membentuk interpreter TensorFlow Lite berdasarkan konfigurasi delegate yang digunakan. BenchmarkLogger bertanggung jawab mencatat metrik performa selama sesi benchmark berlangsung, seperti latensi inferensi, FPS, penggunaan CPU, penggunaan memori, estimasi konsumsi daya, jenis latihan, dan jumlah repetisi. ResourceProfiler digunakan untuk membaca penggunaan sumber daya perangkat secara berkala agar data performa tidak hanya terbatas pada waktu inferensi, tetapi juga mencakup kondisi perangkat selama pengujian.
+Kelompok Model berisi data class dan enumerasi yang digunakan oleh sistem. Person merepresentasikan hasil deteksi pose yang terdiri atas kumpulan Keypoint. Setiap Keypoint menyimpan informasi posisi koordinat, skor keypoint, serta label bagian tubuh. BenchmarkMetrics digunakan untuk merepresentasikan satu baris data hasil benchmark per frame, yang mencakup informasi waktu, model, delegate, latensi, FPS, penggunaan sumber daya, jenis latihan, jumlah repetisi, dan label sesi. Selain itu, ModelType, DelegateType, dan ExerciseType digunakan untuk membatasi pilihan konfigurasi eksperimen agar sesuai dengan rancangan pengujian, yaitu model MoveNet Lightning dan BlazePose Lite, delegate CPU Baseline, XNNPACK, dan GPU, serta jenis latihan squat dan push-up.
+Relasi antar kelas pada diagram menunjukkan alur ketergantungan utama dalam sistem. CameraScreen menggunakan PoseViewModel untuk membaca dan memperbarui state aplikasi. PoseViewModel memiliki dependensi terhadap PoseDetector, ExerciseDetector, BenchmarkLogger, dan ResourceProfiler. Relasi ini menunjukkan bahwa PoseViewModel tidak menjalankan seluruh proses secara langsung, tetapi mendelegasikan tugas khusus ke komponen yang sesuai. MoveNetDetector dan BlazePoseDetector merealisasikan interface PoseDetector, sedangkan SquatDetector dan PushUpDetector merealisasikan interface ExerciseDetector. Dengan rancangan seperti ini, sistem dapat mengganti model pose estimation atau jenis latihan tanpa perlu mengubah struktur utama aplikasi.
+Secara keseluruhan, class diagram ini menunjukkan bahwa aplikasi AccelPose dirancang dengan pemisahan tanggung jawab yang jelas antar komponen. Antarmuka pengguna dipisahkan dari logika inferensi, proses deteksi pose dipisahkan dari penghitungan repetisi, dan pencatatan metrik dipisahkan dari proses visualisasi. Pemisahan tersebut penting karena penelitian ini membutuhkan alat uji yang konsisten untuk membandingkan kombinasi model dan delegate. Dengan struktur kelas seperti pada Gambar 4.x, perubahan pada model, delegate, atau jenis latihan dapat dilakukan secara lebih terkontrol tanpa memengaruhi keseluruhan sistem.
+Perancangan Alur Sistem
+Bagian ini menjelaskan data dari kamera berubah menjadi metrik CSV. Alur data sistem dimulai dari frame kamera yang diperoleh melalui CameraX. Frame tersebut diproses pada tahap preprocessing yang meliputi resize, letterbox padding, dan normalisasi piksel sesuai kebutuhan model. Hasil preprocessing kemudian menjadi input bagi TensorFlow Lite Interpreter yang menjalankan model MoveNet Lightning atau BlazePose Lite dengan konfigurasi delegate tertentu.
+Output inferensi berupa keypoints tubuh diproses kembali pada tahap postprocessing untuk menghasilkan koordinat pose yang sesuai dengan ruang tampilan kamera. Data pose kemudian digunakan oleh RepetitionCounter untuk menghitung sudut sendi dan menentukan jumlah repetisi gerakan. Secara paralel, MetricsCalculator menghitung metrik performa seperti latensi inferensi, FPS, penggunaan CPU, dan penggunaan memori. Seluruh data tersebut dicatat oleh BenchmarkLogger dan dapat diekspor menjadi file CSV untuk dianalisis pada tahap pengujian.
  
-Gambar  4.3 Flowchart Logika Inferensi
-Flowchart Penghitungan Repetisi Logika penghitungan repetisi menggunakan state machine sederhana berdasarkan sudut sendi untuk gerakan Squat dan Push-up.
+Gambar 4.4 Diagram Alir Data Inferensi
+
+Activity Diagram Alur utama
+Activity diagram berikut menggambarkan alur aktivitas utama dalam menjalankan satu sesi benchmarking lengkap, mulai dari membuka aplikasi hingga mengekspor data hasil.
+Alur dimulai dengan inisialisasi aplikasi dan pengecekan izin kamera. Setelah izin diberikan, sistem menampilkan layar utama (CameraScreen) dengan konfigurasi default. Peneliti memilih kombinasi model, delegate, dan jenis latihan melalui panel kontrol. Setiap perubahan konfigurasi memicu reinisialisasi interpreter yang mencakup pelepasan sumber daya lama, pembuatan TFLiteHelper baru, dan eksekusi fase warm-up 5 frame.
+Setelah konfigurasi selesai, sistem memasuki loop inferensi real-time yang berjalan secara kontinu. Pada titik ini, peneliti dapat memulai perekaman data dengan menekan tombol Record. Selama perekaman aktif, setiap frame yang melewati fase warm-up dicatat ke dalam logger. Peneliti menghentikan perekaman dengan tombol Stop, kemudian memilih untuk mengekspor data ke CSV atau mengubah konfigurasi untuk sesi berikutnya.
+Activity diagram berikut mendetailkan proses internal yang terjadi pada setiap frame kamera, mencakup pra-pemrosesan, inferensi, pasca-pemrosesan, dan pencatatan data. Proses dimulai ketika CameraX ImageAnalyzer menerima frame baru. Frame dikonversi dari ImageProxy ke Bitmap, kemudian memasuki tahap letterbox padding untuk menjaga rasio aspek. Selanjutnya, normalisasi piksel dilakukan sesuai spesifikasi model: rentang [0, 1] untuk MoveNet dan [-1, 1] untuk BlazePose.
+Setelah pra-pemrosesan, penanda waktu awal dicatat dan inferensi dijalankan melalui TFLite Interpreter. Penanda waktu akhir dicatat segera setelah inferensi selesai. Pada tahap pasca-pemrosesan, terdapat decision node yang memisahkan alur berdasarkan model: MoveNet langsung mem-parsing 17 keypoints COCO, sedangkan BlazePose memetakan 33 keypoints ke 17 COCO disertai transformasi sigmoid dan EMA smoothing. Koordinat kemudian dikoreksi dari ruang letterbox ke ruang kamera asli.
+Terakhir, terdapat fork node yang menjalankan tiga aktivitas paralel: (1) menampilkan overlay skeleton, (2) memperbarui metrik performa pada UI, dan (3) apabila logging aktif, mencatat data ke BenchmarkLogger.
  
-Gambar  4.4 Flowchart Perhitungan Repetisi
+Gambar 4.5 Activity Diagram Alur Utama Sesi Benchmarking Pose Estimation
 
-Pseudocode Pengukuran Latensi. Pengukuran latensi dilakukan pada level kode menggunakan fungsi waktu sistem beresolusi tinggi.
-FUNCTION RunInference(inputBitmap):
-    // Warm-up (opsional, untuk 5 frame awal)
-    IF frameCount < 5 THEN
-        PerformWarmUp()
-    
-    // Ambil waktu sebelum inferensi
-    startTime = System.nanoTime()
-    
-    // Jalankan TFLite Interpreter
-    results = Interpreter.run(inputBitmap)
-    
-    // Ambil waktu setelah inferensi selesai
-    endTime = System.nanoTime()
-    
-    // Hitung selisih dan konversi ke milidetik
-    latencyNano = endTime - startTime
-    latencyMs = latencyNano / 1,000,000
-    
-    RETURN results, latencyMs
-END FUNCTION
 
-Mekanisme Error Handling & Fallback
-Perancangan Antarmuka Pengguna (UI Design)
-Antarmuka dirancang minimalis menggunakan Jetpack Compose untuk mengurangi overhead grafis.
-Perancangan Antarmuka (UI)
-Aplikasi benchmarking ini dikembangkan menggunakan Jetpack Compose dengan desain antarmuka minimalis untuk meminimalkan beban rendering UI terhadap pengukuran performa. Antarmuka utama terdiri dari:
-	Rancangan Layar Konfigurasi
+Activity Diagram Alur Proses Inferensi
+Activity diagram pada Gambar 4.6 menggambarkan alur pemrosesan satu frame kamera mulai dari penerimaan frame oleh CameraX ImageAnalyzer hingga hasil inferensi ditampilkan dan dicatat sebagai data benchmark. Diagram ini berfokus pada proses internal aplikasi ketika sistem menerima satu frame baru, melakukan preprocessing, menjalankan inferensi TensorFlow Lite, memproses output model, memperbarui tampilan, dan menutup ImageProxy setelah pemrosesan selesai.
  
-Gambar  4.5 Wireframe Layar Monitoring
-
-	Rancangan Layar Monitoring Real-Time
+Gambar 4.6 Activity Diagram Alur Proses Inferensi 
+Berdasarkan Gambar 4.6, proses dimulai ketika CameraX ImageAnalyzer menerima frame baru dalam bentuk ImageProxy. Frame tersebut dikonversi menjadi Bitmap, kemudian diproses menggunakan letterbox padding agar rasio citra tetap terjaga sebelum masuk ke model pose estimation. Tahap preprocessing disesuaikan dengan model yang aktif. MoveNet Lightning menggunakan ukuran input 192 × 192 dengan normalisasi [0, 1], sedangkan BlazePose Lite menggunakan ukuran input 256 × 256 dengan normalisasi [-1, 1].
+Setelah preprocessing selesai, sistem mencatat waktu awal menggunakan System.nanoTime(), menjalankan inferensi melalui TFLite Interpreter, lalu mencatat waktu akhir untuk menghitung latensi inferensi. Output inferensi kemudian diproses sesuai model yang digunakan. Pada MoveNet, output diproses menjadi 17 keypoints dalam format COCO. Pada BlazePose, output 33 keypoints dipetakan ke format COCO agar dapat digunakan oleh alur visualisasi dan perhitungan metrik yang sama.
+Hasil keypoints kemudian dikoreksi dari ruang letterbox ke ruang kamera dan dihitung rata-rata confidence-nya. Apabila confidence memenuhi ambang minimum, sistem membentuk hasil pose, memperbarui state aplikasi, menggambar overlay skeleton, dan memperbarui panel metrik. Apabila logging aktif, data per-frame disimpan ke buffer BenchmarkLogger sebagai BenchmarkMetrics. Apabila confidence tidak memenuhi ambang minimum, sistem menandai bahwa pose tidak terdeteksi pada frame tersebut. Pada akhir proses, ImageProxy ditutup agar pipeline CameraX dapat menerima frame berikutnya. Penutupan ImageProxy penting karena dokumentasi CameraX menyatakan bahwa frame harus dirilis dengan memanggil ImageProxy.close() setelah analisis selesai.
+Sequence Diagram
+Perancangan sequence diagram merupakan bagian dari pendekatan Object Oriented Design (OOD) yang digunakan untuk memodelkan interaksi antar objek dalam sistem. Sequence diagram menggambarkan alur komunikasi dan pertukaran pesan antar objek dalam urutan waktu tertentu untuk setiap use case atau skenario yang telah didefinisikan. Diagram ini memvisualisasikan bagaimana objek-objek dalam sistem berkolaborasi untuk menyelesaikan suatu fungsi atau proses bisnis tertentu.
+Diagram sekuen berikut menggambarkan interaksi antar komponen sistem pada tiga skenario utama: inisialisasi sistem, proses inferensi real-time, serta penghitungan repetisi dan pencatatan data. Ketiga diagram ini merepresentasikan alur kontrol yang mengikuti pola arsitektur MVVM berlapis (Presentation-Domain-Data Layer).
+Perancangan Sequence Diagram Inisialisasi Sistem
+Sequence diagram inisialisasi sistem menggambarkan interaksi antar komponen ketika aplikasi pertama kali dijalankan hingga sistem siap menerima frame kamera untuk proses inferensi. Diagram ini melibatkan aktor Peneliti serta beberapa komponen utama, yaitu MainActivity, CameraScreen, PoseViewModel, TFLiteHelper, ResourceProfiler, dan TFLite Interpreter. Alur ini dirancang untuk memastikan bahwa izin kamera, konfigurasi model, konfigurasi delegate, dan proses profiling sumber daya telah disiapkan sebelum sesi benchmarking dilakukan.
  
-Gambar  4.6 Wireframe Layar Monitoring
+Gambar 4.7 Sequence Diagram Inisialisasi Sistem
+Berdasarkan Gambar 4.5, proses inisialisasi dimulai ketika Peneliti membuka aplikasi. MainActivity terlebih dahulu memeriksa izin kamera. Apabila izin belum diberikan, sistem menampilkan PermissionRequestScreen agar Peneliti dapat memberikan akses kamera. Setelah izin tersedia, MainActivity menampilkan CameraScreen sebagai antarmuka utama untuk menjalankan proses benchmarking.
+Pada tahap berikutnya, CameraScreen menginisialisasi PoseViewModel dengan konfigurasi awal, yaitu model MoveNet Lightning dan CPU Baseline. PoseViewModel kemudian membentuk objek TFLiteHelper untuk memuat berkas model dan membuat TFLite Interpreter sesuai konfigurasi delegate yang dipilih. Apabila sistem menggunakan CPU Baseline, interpreter dibuat tanpa XNNPACK. Apabila sistem menggunakan XNNPACK, interpreter dibuat dengan mengaktifkan XNNPACK. Sementara itu, apabila sistem menggunakan GPU, interpreter dibuat dengan GPU delegate. Delegate dalam LiteRT/TensorFlow Lite digunakan untuk memanfaatkan akselerator perangkat seperti GPU atau DSP, sehingga bagian ini penting untuk mendukung perbandingan performa antar konfigurasi akselerasi. 
+Diagram ini juga menunjukkan alur alternatif ketika inisialisasi GPU gagal. Pada kondisi tersebut, TFLiteHelper melakukan fallback ke XNNPACK agar aplikasi tetap dapat berjalan meskipun GPU delegate tidak tersedia atau tidak kompatibel pada perangkat uji. Setelah interpreter berhasil dibuat, ResourceProfiler mulai melakukan polling penggunaan CPU, memori, dan daya, sedangkan CameraScreen menjalankan CameraX Preview serta mendaftarkan PoseImageAnalyzer. Dengan demikian, keluaran dari proses ini adalah sistem yang telah siap menerima frame dan menjalankan inferensi pose estimation secara real-time.
 
-	Layar Hasil Eksperimen
+Perancangan Sequence Diagram Proses Inferensi Real-time
  
-Gambar  4.7 Wireframe Layar Hasil
-
-Perancangan Sistem Pengukuran Metrik
-Subbab ini menjelaskan strategi teknis yang digunakan untuk mengumpulkan data variabel terikat dengan akurasi dan reliabilitas tinggi. Sistem pengukuran merupakan komponen krusial yang menentukan validitas hasil penelitian.
-Strategi Pengukuran Latensi
-Pengukuran latensi inferensi menggunakan fungsi System.nanoTime() pada bahasa Kotlin yang menyediakan presisi tingkat nanodetik (10^(-9) detik). Pemilihan instrumen ini didasarkan pada tiga pertimbangan utama:
-	Presisi Tinggi: Mampu mendeteksi perbedaan waktu yang sangat kecil (di bawah 1 milidetik)
-	Sifat Monotonic Clock: Tidak terpengaruh oleh perubahan waktu sistem atau sinkronisasi jaringan.
-	Overhead Rendah: Memiliki overhead eksekusi sekitar 50 nanodetik yang dapat diabaikan (negligible) dibandingkan latensi inferensi model (20-100 milidetik).
-Titik pengambilan waktu (timing point) dilakukan tepat sebelum pemanggilan fungsi interpreter.run() dan segera setelah fungsi tersebut selesai. Selisih kedua penanda waktu (timestamp) kemudian dikonversi ke satuan milidetik. Pengukuran dilakukan pada tiga tingkatan: latensi inferensi murni (waktu eksekusi model), latensi pra-pemrosesan (preprocessing), dan latensi total (end-to-end).
-Untuk menjaga validitas data, protokol pemanasan (warm-up) diterapkan dengan menjalankan 5 frame awal tanpa pencatatan data. Langkah ini memastikan GPU mencapai kecepatan clock optimal dan menghindari pencilan (outlier) akibat efek inisialisasi cache yang seringkali menyebabkan inferensi awal berjalan 2-3 kali lebih lambat.
-Validasi akurasi pengukuran dilakukan melalui uji silang (cross-check) dengan TensorFlow Lite Benchmark Tool (utilitas pengujian resmi dari Google). Kriteria penerimaan (acceptance criteria) adalah selisih rata-rata latensi kurang dari 5% dibandingkan nilai referensi alat standar tersebut.
-4.5.2 Strategi Profiling Sumber Daya
-Pengukuran sumber daya komputasi dilakukan untuk memahami efisiensi setiap delegate dalam memanfaatkan perangkat keras
-	Penggunaan CPU: Diukur menggunakan Android Profiler API dengan membaca berkas sistem /proc/stat yang menyediakan waktu CPU kumulatif dalam satuan jiffy. Interval pengambilan data (polling) ditetapkan setiap 100 milidetik untuk menyeimbangkan antara resolusi temporal dan beban sistem. Persentase penggunaan CPU dihitung menggunakan formula:
-CPU Usage (%)=  (Total Time-Idle Time)/(Total Time)  x 100%
-	Penggunaan Memori: Diukur menggunakan Debug.MemoryInfo yang menyediakan rincian memori heap (objek Java/Kotlin), memori native (bobot model TFLite dan buffer), serta total Proportional Set Size (PSS). Pelacakan memori puncak (peak memory tracking) dilakukan dengan mencatat nilai maksimum dari setiap komponen selama eksperimen berlangsung untuk mendeteksi potensi kebocoran memori (memory leaks).
-	Konsumsi Daya: Estimasi daya menggunakan BatteryManager API. Laju pengurasan baterai (drain rate) dihitung dari selisih penghitung energi (energy counter) dibagi dengan durasi pengujian untuk mendapatkan rata-rata konsumsi daya dalam satuan miliwatt (mW).
-4.5.3 Validasi Alat Ukur Fungsional
-Validasi fungsional bertujuan memastikan logika deteksi repetisi berjalan benar dan konsisten meskipun terjadi fluktuasi framerate atau variasi akurasi deteksi pose. Prosedur validasi melibatkan tahapan berikut:
-	Perekaman Sampel: Merekam video latihan dengan jumlah repetisi yang diketahui dan terkontrol (misalnya 30 squat dengan tempo konsisten).
-	Eksekusi Otomatis: Menjalankan sistem deteksi pada video tersebut menggunakan model dan delegate target.
-	Verifikasi Manual: Membandingkan hasil hitungan sistem dengan hitungan manual (ground truth) yang dilakukan oleh pengamat.
-	Perhitungan Akurasi: Menghitung persentase akurasi dengan rumus:
-Akurasi (%)=(Repetisi Terdeteksi)/(Repetisi Sebenarnya)  x 100%
-
-Target akurasi minimum ditetapkan sebesar 90% untuk menjamin keandalan sistem dalam kondisi nyata yang memiliki variabilitas gerakan. Validasi dilakukan pada subset video yang merepresentasikan berbagai kondisi, seperti variasi kecepatan gerakan (slow vs fast) dan kondisi pencahayaan yang berbeda.
-Tabel 4.1 Rancangan Struktur File CSV Hasil Benchmarking
-No	Nama Kolom (Header)	Tipe Data	Deskripsi
-1	Timestamp	Long / String	Waktu pengambilan data (format: yyyy-MM-dd HH:mm:ss) untuk urutan time-series.
-2	Model_Name	String	Varian model yang sedang diuji (contoh: "MoveNet Lightning" atau "BlazePose Lite").
-3	Delegate_Type	String	Jenis akselerator yang aktif (contoh: "GPU", "CPU", "XNNPACK").
-4	Device_Name	String	Identitas perangkat pengujian (contoh: "Samsung A06").
-5	Inference_Time_ms	Float	Waktu yang dibutuhkan untuk satu kali proses inferensi dalam milidetik.
-6	FPS	Float	Jumlah frame per detik yang berhasil diproses saat itu.
-7	CPU_Usage_Percent	Float	Persentase penggunaan CPU saat frame diproses.
-8	Memory_Usage_MB	Float	Penggunaan RAM oleh aplikasi dalam satuan Megabyte.
-9	Battery_Current_mA	Float	Arus baterai saat pengujian (untuk estimasi konsumsi daya).
-10	Repetition_Count	Integer	Jumlah repetisi yang terdeteksi valid (untuk validasi fungsional).
+Gambar 4.8 Sequence Diagram Siklus Inferensi Real-time
+Berdasarkan Gambar 4.6, proses inferensi dimulai ketika CameraX mengirimkan frame kamera dalam bentuk ImageProxy kepada PoseImageAnalyzer. Setiap frame yang diterima dihitung sebagai bagian dari total frame, kemudian dikonversi menjadi bitmap dan diproses melalui tahap letterbox agar ukuran input sesuai dengan kebutuhan model. Pada tahap ini, frame juga dipersiapkan agar dapat digunakan oleh model pose estimation tanpa mengubah rasio citra secara berlebihan.
+Setelah preprocessing selesai, PoseImageAnalyzer memanggil PoseDetector untuk menjalankan proses deteksi pose. PoseDetector mencatat waktu awal sebelum inferensi dan waktu akhir setelah inferensi selesai, sehingga latensi inferensi dapat dihitung dalam satuan milidetik. Proses inferensi dilakukan oleh TFLite Interpreter melalui input buffer dan output buffer. Pada implementasi CameraX, frame yang diterima melalui ImageAnalysis harus dianalisis secepat mungkin dan ImageProxy perlu ditutup setelah selesai agar pipeline kamera tidak terhambat. 
+Diagram ini juga menunjukkan adanya percabangan proses berdasarkan model yang digunakan. Jika model yang aktif adalah MoveNet Lightning, output tensor diproses menjadi 17 keypoints. Jika model yang aktif adalah BlazePose Lite, output tensor diproses menjadi 33 keypoints kemudian dipetakan ke format keypoints yang digunakan sistem. Setelah keypoints diperoleh, sistem menerapkan smoothing untuk mengurangi fluktuasi posisi titik tubuh antar-frame. Hasil akhir dari tahap ini berupa data pose yang telah dikoreksi koordinatnya agar sesuai dengan tampilan kamera.
+Pada akhir siklus, hasil inferensi dikirimkan ke PoseViewModel. Jika frame masih berada pada fase warm-up, hasil tidak digunakan sebagai data benchmark. Jika warm-up telah selesai, PoseViewModel memperbarui state aplikasi dengan data pose, latensi, FPS, dan jumlah repetisi. Apabila jenis latihan yang dipilih bukan NONE, ExerciseDetector menganalisis pose untuk menghitung repetisi gerakan. Selanjutnya, CameraScreen menampilkan skeleton overlay dan memperbarui panel metrik. Dengan demikian, sequence diagram ini menjelaskan alur inti sistem dari frame kamera hingga visualisasi pose dan metrik real-time.
 
 
+Perancangan Sequence Diagram Pencatatan dan Ekspor Data
+ 
+Gambar 4.9 Sequence Diagram Pencatatan dan Ekspor Data
+
+Berdasarkan Gambar 4.7, proses dimulai ketika Peneliti menekan tombol Record pada CameraScreen. CameraScreen meneruskan perintah tersebut ke PoseViewModel untuk memulai proses logging. PoseViewModel kemudian meminta BenchmarkLogger membuka sesi pencatatan baru berdasarkan label konfigurasi eksperimen. Pada tahap ini, BenchmarkLogger mengaktifkan status logging, membersihkan antrean data sebelumnya, dan mengatur ulang nomor frame. Setelah sesi berhasil dimulai, CameraScreen memperbarui tampilan tombol Record menjadi Stop dan menampilkan indikator bahwa proses perekaman sedang berjalan.
+Selama proses logging aktif, setiap frame yang telah melewati proses inferensi menghasilkan data benchmark yang dicatat ke dalam BenchmarkLogger. Data yang dicatat mencakup timestamp, model yang digunakan, delegate yang digunakan, latensi inferensi, FPS, penggunaan CPU, penggunaan memori, estimasi konsumsi daya, jenis latihan, jumlah repetisi, nomor frame, status deteksi pose, dan label sesi. Namun, frame pada fase warm-up tidak dimasukkan ke dalam data benchmark karena fase tersebut digunakan untuk menstabilkan proses awal inferensi. Setelah fase warm-up selesai, metrik per-frame disimpan ke dalam antrean logger dan nomor frame diperbarui.
+Ketika Peneliti menekan tombol Stop, CameraScreen meminta PoseViewModel menghentikan proses logging. BenchmarkLogger kemudian mengubah status logging menjadi tidak aktif dan menghitung statistik ringkasan seperti nilai rata-rata, minimum, maksimum, dan standar deviasi untuk setiap metrik. Statistik tersebut dikembalikan ke PoseViewModel dan ditampilkan oleh CameraScreen sebagai ringkasan hasil sesi benchmark.
+Pada fase ekspor, Peneliti menekan tombol Export CSV. PoseViewModel meneruskan perintah ekspor kepada BenchmarkLogger untuk mengubah antrean data menjadi format CSV. Sistem kemudian membangkitkan nama file berdasarkan timestamp agar setiap hasil pengujian memiliki nama unik. Untuk penyimpanan pada perangkat Android modern, diagram menggunakan MediaStore API agar file hasil ekspor dapat disimpan melalui mekanisme penyimpanan yang sesuai dengan kebijakan shared storage Android. Android menyediakan MediaStore API untuk mengakses dan mengelola file pada shared storage, termasuk file yang dibuat oleh aplikasi sendiri. 
+Diagram ini juga menunjukkan alur alternatif ketika ekspor berhasil atau gagal. Apabila proses penyimpanan berhasil, sistem mengembalikan lokasi file dan menampilkan pesan bahwa data berhasil diekspor. Apabila terjadi kesalahan seperti IOException, sistem menampilkan pesan bahwa data gagal disimpan. Dengan demikian, diagram ini memastikan bahwa proses pencatatan data benchmark tidak hanya mencakup pengumpulan metrik, tetapi juga validasi akhir berupa penyimpanan file CSV yang akan digunakan pada tahap analisis hasil penelitian.
+
+Perancangan Algoritma 
+Flowchart Alur Inferensi
+ 
+Gambar 4.10 Flowchart Alur Inferensi Per Frame
+Gambar 4.10 menggambarkan alur inferensi pose yang dirancang untuk berjalan pada setiap frame yang diterima dari kamera. Proses dimulai dari penerimaan frame mentah, dilanjutkan dengan pra-pemrosesan yang mencakup letterbox padding untuk menjaga rasio aspek, resize ke dimensi masukan model, dan normalisasi nilai piksel. Pra-pemrosesan bercabang berdasarkan model yang aktif: MoveNet Lightning menggunakan resolusi 192×192 piksel dengan normalisasi ke rentang [0, 1], sedangkan BlazePose Lite menggunakan 256×256 piksel dengan rentang [-1, 1].
+Setelah inferensi dijalankan, latensi diukur dan keluaran model melalui pasca-pemrosesan untuk menghasilkan 17 keypoints dalam format COCO. Koordinat keypoints kemudian dikoreksi kembali ke ruang koordinat kamera asli dengan menginversi transformasi letterbox. Pose dinyatakan valid apabila rata-rata skor kepercayaan seluruh keypoints memenuhi ambang batas yang ditetapkan. Terakhir, terdapat protokol warm-up untuk lima frame pertama — selama fase ini hasil inferensi tidak dicatat sebagai data benchmark guna menghindari pencilan akibat inisialisasi sistem.
+State Machine Repetisi
+ 
+Gambar 4.11 State Machine Perhitungan Repetisi Squat dan Push-up
+State machine pada Gambar 4.11 digunakan untuk memodelkan perubahan fase gerakan pada proses penghitungan repetisi squat dan push-up. Pendekatan ini dipilih karena satu repetisi tidak dapat ditentukan hanya dari nilai sudut pada satu frame, melainkan dari urutan perubahan fase gerakan. Oleh karena itu, sistem menyimpan state gerakan saat ini dan hanya menambah jumlah repetisi apabila pengguna telah melewati urutan state yang valid.
+Pada squat detector, state awal adalah STANDING, yaitu kondisi ketika sudut lutut berada pada posisi relatif lurus. Ketika sudut lutut menurun melewati threshold tertentu, sistem berpindah ke state GOING_DOWN. Jika sudut terus mengecil hingga mencapai fase bawah, sistem masuk ke state SQUATTING. Setelah itu, ketika sudut lutut kembali meningkat, sistem berpindah ke state GOING_UP. Repetisi baru dihitung ketika sistem kembali mencapai posisi berdiri dengan sudut lutut memenuhi threshold akhir. Dengan alur ini, sistem dapat menghindari penghitungan repetisi ganda akibat fluktuasi sudut pada satu fase gerakan.
+Pada push-up detector, state awal adalah UP, yaitu kondisi ketika sudut siku menunjukkan posisi lengan relatif lurus. Ketika sudut siku menurun, sistem berpindah ke state GOING_DOWN_P dan kemudian masuk ke state DOWN ketika sudut mencapai fase bawah. Setelah itu, sistem berpindah ke state GOING_UP_P ketika sudut siku meningkat kembali. Repetisi dihitung ketika sudut siku mencapai threshold posisi atas. Sama seperti pada squat, mekanisme ini memastikan bahwa repetisi dihitung berdasarkan urutan gerakan penuh dari posisi awal, turun, lalu kembali ke posisi awal.
+State machine ini juga menerapkan hysteresis, yaitu penggunaan threshold masuk dan keluar yang berbeda untuk mengurangi perubahan state yang terlalu cepat akibat noise pada hasil pose estimation. Selain itu, sudut sendi dihaluskan terlebih dahulu sebelum dievaluasi oleh state machine agar perubahan kecil antar-frame tidak langsung menyebabkan transisi state. Hold time pada posisi bawah digunakan sebagai indikator kestabilan gerakan. Pada implementasi saat ini, hold time berfungsi sebagai validasi tambahan dan dapat menghasilkan peringatan apabila durasi terlalu pendek, tetapi tidak menjadi syarat utama yang memblokir transisi ke state berikutnya.
+Error Handling & Fallback
+Pada umumnya, perancangan sistem harus mampu menangani berbagai kondisi kegagalan yang mungkin terjadi selama eksperimen tanpa menyebabkan aplikasi crash. Mekanisme penanganan kesalahan dibagi menjadi tiga kategori berdasarkan tingkat keparahan.
+Tabel 4.11 Tabel Skenario Kegagalan dan Mekanisme Penanganan
+Kategori	Kondisi Kegagalan	Mekanisme Penanganan	Dampak terhadap Eksperimen
+Kegagalan Inisialisasi GPU	GpuDelegate gagal dibuat karena driver GPU tidak kompatibel atau operator model tidak didukung oleh GPU.	1. Sistem menangkap exception pada blok try-catch.
+2. GpuDelegate dilepaskan (dispose).
+3. Interpreter diinisialisasi ulang dengan XNNPACK.
+4. Pesan peringatan ditampilkan pada UI.	Eksperimen tetap berjalan dengan delegate XNNPACK. Data konfigurasi GPU pada perangkat ini ditandai sebagai "tidak tersedia".
+Kegagalan Pemuatan Model	File .tflite tidak ditemukan di folder assets atau file corrupt.	1. Exception ditangkap saat loadModelFile().
+2. Interpreter diset ke null.
+3. Pesan error ditampilkan pada UI.	Inferensi tidak berjalan. Peneliti harus memverifikasi file model dan menginstal ulang aplikasi.
+Frame Kamera Tidak Tersedia	ImageProxy kosong atau format tidak didukung.	1. Fungsi analyze() mengembalikan hasil kosong.
+2. Frame diskip tanpa pencatatan.
+3. Counter totalFrameCount tidak bertambah.	Frame yang gagal tidak tercatat. Tidak memengaruhi data yang sudah dikumpulkan.
+Keypoints Confidence Rendah	Rata-rata skor confidence seluruh keypoints di bawah 0,3 (pose tidak terdeteksi).	1. Fungsi detectPose() mengembalikan null.
+2. Overlay skeleton tidak digambar.
+3. Deteksi repetisi diskip untuk frame ini.	Frame dengan confidence rendah tetap mencatat latensi inferensi (karena inferensi tetap berjalan), namun repetisi tidak dihitung.
+Kegagalan Ekspor CSV	Penyimpanan perangkat penuh atau izin tulis tidak diberikan.	1. Exception ditangkap saat operasi I/O.
+2. Pesan error ditampilkan.
+3. Data tetap tersimpan di memori (antrian logger).	Peneliti dapat mencoba ekspor ulang setelah mengosongkan penyimpanan.
+Kegagalan Pembacaan /proc/stat	Android membatasi akses ke file sistem pada API Level 26+.	1. Fallback ke Process.getElapsedCpuTime().
+2. Metrik CPU tetap tersedia meskipun granularitas lebih rendah.	Nilai utilisasi CPU mungkin kurang granular tetapi tetap representatif.
+
+Perancangan Anttarmuka
+Antarmuka aplikasi dirancang dengan prioritas fungsionalitas pengujian, bukan estetika. Seluruh elemen kontrol eksperimen dan tampilan metrik harus dapat diakses dari satu layar tanpa perpindahan halaman (single-screen design). Pendekatan ini dipilih untuk meminimalkan latensi interaksi saat peneliti berganti konfigurasi antar-sesi pengujian.
+Wireframe Layar Utama
+Layar utama terdiri dari tiga lapisan yang ditumpuk secara vertikal menggunakan Box layout: lapisan kamera, lapisan overlay skeleton, dan lapisan panel kontrol. Gambar 4.12 menunjukkan wireframe rancangan antarmuka dalam dua kondisi panel: collapsed (ringkas) dan expanded (lengkap).
+ 
+Gambar 4.12 Wireframe Layar Utama
+Pada mode collapsed, panel kontrol menampilkan hanya dua metrik utama (latensi dan FPS) serta penghitung repetisi apabila jenis latihan dipilih. Mode ini digunakan saat pengujian berlangsung untuk memaksimalkan area tampilan kamera. Pada mode expanded, panel kontrol menampilkan seluruh komponen berikut:
+	Tiga dropdown selector untuk memilih model, delegate, dan jenis latihan.
+	Panel metrik lengkap: latensi (ms), FPS, utilisasi CPU (%), penggunaan memori (MB), dan estimasi konsumsi daya (mW).
+	Panel latihan: jumlah repetisi, sudut sendi aktual, dan tombol reset.
+	Panel logging: tombol Record/Stop, counter frame, durasi sesi, dan tombol Export CSV.
+	Informasi perangkat: model, versi Android, dan chipset.
+
+Indikator warm-up ditampilkan di bagian atas layar selama lima frame pertama setelah inisialisasi, memberikan umpan balik visual kepada peneliti bahwa sistem belum dalam kondisi stabil untuk pencatatan data. Indikator ini menghilang secara otomatis setelah fase warm-up selesai.
+Strategi Pengukuran Metrik
+Keandalan data eksperimen bergantung pada ketepatan strategi pengukuran. Subbab ini merinci rancangan mekanisme pengukuran untuk setiap variabel terikat: latensi inferensi, profiling sumber daya sistem, dan struktur pencatatan data.
+Pengukuran Latensi Inferensi
+Latensi inferensi didefinisikan sebagai waktu yang dibutuhkan oleh TFLite Interpreter untuk memproses satu frame masukan dan menghasilkan prediksi keypoints. Pengukuran dibatasi hanya pada pemanggilan interpreter.run() tanpa menyertakan waktu pra-pemrosesan dan pasca-pemrosesan, sehingga nilai yang diperoleh mencerminkan performa akselerasi delegate secara murni.
+Pengukuran menggunakan System.nanoTime() yang memberikan resolusi waktu dalam nanosecond. Metode ini dipilih karena tidak terpengaruh oleh perubahan jam sistem (wall clock) dan memberikan presisi yang cukup untuk mengukur latensi dalam rentang puluhan milidetik. Pseudocode pengukuran dirancang sebagai berikut:
+Tabel 4.12 Pseudocode Pengukuran Latensi Inferensi
+// Inisialisasi warm-up counter
+frameCount ← 0
+WARM_UP_FRAMES ← 5
+PROCEDURE analyzeFrame(imageProxy):
+    frameCount ← frameCount + 1
+    isWarmUp ← (frameCount ≤ WARM_UP_FRAMES)
+    bitmap ← convertToBitmap(imageProxy)
+    letterboxed ← applyLetterbox(bitmap, model.inputSize)
+    startTime ← System.nanoTime()             // catat waktu mulai
+    result ← interpreter.run(letterboxed)      // HANYA blok ini yang diukur
+    endTime ← System.nanoTime()               // catat waktu selesai
+    latencyMs ← (endTime - startTime) / 1_000_000
+    IF isWarmUp THEN
+        sendToViewModel(result, latency = 0)   // tidak dicatat
+    ELSE
+        sendToViewModel(result, latencyMs)     // dicatat ke logger
+    END IF
+    imageProxy.close()
+END PROCEDURE
+
+Protokol warm-up sebanyak 5 frame pertama diterapkan untuk menghindari pencilan akibat dua fenomena, yaitu inisialisasi cache GPU yang menyebabkan inferensi pertama berjalan 2–3 kali lebih lambat dari kondisi stabil, dan JIT compilation yang memengaruhi kinerja beberapa iterasi pertama eksekusi kode. Data latensi yang dicatat dimulai dari frame keenam dan seterusnya, yang merepresentasikan kondisi operasional normal.
+Profiling Sumber Daya Sistem
+Profiling sumber daya dilakukan secara paralel dengan inferensi menggunakan interval polling 100 milidetik. Interval ini dipilih untuk menyeimbangkan resolusi temporal yang memadai dengan beban overhead pengukuran yang minimal. Tiga metrik sumber daya diukur menggunakan API Android yang berbeda-beda, sebagaimana dijelaskan pada Tabel 4.13.
+Tabel 4.13 Metode Pengukuran Profiling Sumber Daya
+Metrik	API Utama	Mekanisme	Fallback
+Utilisasi CPU (%)	/proc/stat /proc/[pid]/stat	Delta waktu CPU aplikasi dibagi delta total waktu CPU, dikalikan jumlah inti prosesor.	Process.getElapsedCpuTime() — jika /proc/stat tidak dapat diakses (Android ≥ 8.0).
+Penggunaan Memori (MB)	Debug.MemoryInfo API	Proportional Set Size (PSS) dalam kilobyte dibagi 1024. PSS memperhitungkan pembagian memori antar-proses secara proporsional.	Runtime.totalMemory() − freeMemory() sebagai estimasi kasar Java heap.
+Konsumsi Daya (mW) [deskriptif]	BatteryManager API	P = V (mV) × I (µA) / 1.000.000, di mana V adalah tegangan baterai dan I adalah arus baterai saat ini.	Tidak tersedia jika perangkat tidak mendukung BATTERY_PROPERTY_CURRENT_NOW.
+
+Konsumsi daya dilaporkan sebagai metrik deskriptif tambahan dan tidak dimasukkan ke dalam analisis ANOVA. Alasannya adalah keterbatasan granularitas sensor baterai pada perangkat Android low-to-mid range, sehingga nilai arus baterai diperbarui dengan interval yang tidak konsisten dan sangat dipengaruhi oleh faktor eksternal seperti aktivitas layar dan sensor akselerometer. Akibatnya, fluktuasi nilai yang tinggi dalam sesi pengukuran berdurasi pendek menurunkan validitas uji statistik.
+Struktur File CSV Output
+Seluruh data metrik per-frame diekspor ke format CSV untuk analisis statistik lanjutan. Format penamaan berkas mengikuti pola: accelpose_benchmark_[yyyyMMdd_HHmmss].csv. Data dari masing-masing perangkat uji disimpan dalam berkas terpisah untuk memudahkan analisis per-perangkat. Struktur kolom CSV dirancang sebagaimana disajikan pada Tabel 4.14.
+No	Nama Kolom	Tipe Data	Deskripsi
+1	timestamp	Long	Waktu pengambilan data (epoch milliseconds)
+2	model_type	String	Nama model: MoveNet Lightning atau BlazePose Lite
+3	delegate_type	String	Delegate aktif: CPU Baseline, XNNPACK, atau GPU
+4	inference_time_ms	Long	Latensi inferensi murni TFLite (milidetik) — variabel terikat utama
+5	processing_time_ms	Long	Waktu end-to-end termasuk pra/pasca-pemrosesan (milidetik)
+6	fps	Float	Throughput (frame per second) — variabel terikat utama
+7	cpu_usage_percent	Float	Utilisasi CPU proses aplikasi (%) — variabel terikat utama
+8	memory_usage_mb	Float	Penggunaan memori PSS (megabyte) — variabel terikat utama
+9	power_consumption_mw	Float	Estimasi konsumsi daya (miliwatt) — metrik deskriptif
+10	exercise_type	String	Jenis latihan: SQUAT, PUSH_UP, atau NONE
+11	repetition_count	Integer	Jumlah repetisi kumulatif yang terdeteksi dalam sesi
+12	frame_number	Integer	Nomor urut frame dalam sesi logging (mulai dari 1)
+13	pose_detected	Integer	Status deteksi pose: 1 = terdeteksi, 0 = tidak terdeteksi
+14	session_label	String	Label sesi dalam format [Model]_[Delegate]_[Latihan]
+15	effective_delegate_type	String	Delegate yang benar-benar digunakan (berbeda dari delegate_type jika terjadi fallback GPU → XNNPACK)
+
+Kolom effective_delegate_type (kolom ke-15) merupakan tambahan penting untuk keandalan data eksperimen. Kolom ini mencatat delegate yang benar-benar digunakan oleh interpreter, yang dapat berbeda dari kolom delegate_type apabila terjadi fallback otomatis dari GPU ke XNNPACK. Dengan demikian, analisis statistik dapat mengidentifikasi dan mengeksklusi sesi yang tidak sesuai dengan konfigurasi yang dimaksud, tanpa bergantung pada observasi manual peneliti.
+Pencatatan data hanya aktif ketika peneliti menekan tombol Record pada panel kontrol dan berjalan pada thread terpisah dari thread UI untuk memastikan operasi I/O tidak memengaruhi pengukuran latensi. Data diekspor ke folder Downloads perangkat menggunakan MediaStore API (Android 10+) atau akses penyimpanan eksternal langsung untuk versi Android sebelumnya.
 
 
+IMPLEMENTASI SISTEM
+Lingkungan Pengembangan
+Pengembangan aplikasi menggunakan Android Studio Iguana (2024.1.1) dengan bahasa pemrograman Kotlin dan sistem build Gradle Kotlin DSL. Pustaka inferensi menggunakan TensorFlow Lite versi 2.14.0 yang terdiri dari tiga komponen terpisah untuk kontrol granular terhadap fitur akselerasi. Spesifikasi lengkap lingkungan pengembangan disajikan pada Tabel 5.1
+Tabel 5.1 Spesifikasi Lingkungan Pengembangan
+Komponen	Spesifikasi
+IDE	Android Studio Iguana (2024.1.1)
+Bahasa Pemrograman	Kotlin (JVM Target 11)
+Build System	Gradle Kotlin DSL
+Minimum SDK	API Level 26 (Android 8.0 Oreo)
+Target SDK	API Level 34 (Android 14)
+UI Framework	Jetpack Compose (Material 3)
+Kamera	CameraX 1.3.0
+tensorflow-lite	2.14.0 — runtime inferensi utama
+tensorflow-lite-gpu	2.14.0 — dukungan GPU Delegate
+tensorflow-lite-support	0.4.4 — utilitas pra-pemrosesan citra
+Arsitektur	MVVM (Model-View-ViewModel)
+
+Minimum SDK ditetapkan pada API Level 26 (Android 8.0) untuk memastikan kompatibilitas dengan kedua perangkat uji. Pemisahan library TensorFlow Lite menjadi tiga komponen memungkinkan fleksibilitas dalam memuat GPU Delegate secara kondisional sesuai dukungan perangkat, tanpa mewajibkan seluruh perangkat memiliki driver OpenCL/OpenGL yang kompatibel.
+
+Implementasi Antarmuka
+Antarmuka pengguna diimplementasikan menggunakan Jetpack Compose dengan pendekatan deklaratif dan reaktif. Seluruh elemen UI merespons perubahan state secara otomatis melalui mekanisme StateFlow dari ViewModel tanpa manipulasi tampilan manual.
+Struktur Aktivitas Utama
+Antarmuka pengguna diimplementasikan menggunakan Jetpack Compose dengan pendekatan deklaratif dan reaktif. Seluruh elemen UI merespons perubahan state secara otomatis melalui mekanisme StateFlow dari ViewModel tanpa manipulasi tampilan manual.
+class MainActivity : ComponentActivity() {
+    private var hasCameraPermission by mutableStateOf(false)
+    private val cameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        hasCameraPermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        setContent {
+            if (hasCameraPermission) CameraScreen()
+            else PermissionRequestScreen { cameraPermissionLauncher.launch(...) }
+        }
+    }
+}
+
+Pendekatan ini memastikan akses ke sensor kamera hanya dilakukan setelah izin eksplisit diberikan pengguna, sesuai kebijakan keamanan Android sejak API Level 23.
+
+Layar Deteksi & Panel Kontrol
+Komponen utama antarmuka diimplementasikan dalam fungsi composable bernama CameraScreen. Layar ini menggunakan Box layout untuk menumpuk empat lapisan secara vertikal: (1) preview kamera sebagai dasar, (2) visualisasi overlay skeleton pose, (3) indikator warm-up, dan (4) panel kontrol di bagian bawah. CameraX dikonfigurasi dengan resolusi target 640×480 piksel dan strategi STRATEGY_KEEP_ONLY_LATEST untuk membuang frame yang tidak sempat diproses, sehingga menjaga responsivitas antarmuka.
+	Panel kontrol (ControlPanel) dirancang dalam dua mode: collapsed dan expanded. Pada mode collapsed, hanya metrik FPS dan latensi yang ditampilkan bersama penghitung repetisi. Pada mode expanded, seluruh komponen pengujian tersedia: tiga dropdown selector untuk konfigurasi model, delegate, dan jenis latihan; panel metrik lengkap (latensi, FPS, CPU, memori, daya); panel latihan dengan sudut sendi aktual; panel logging dengan tombol Record/Stop dan Export CSV; serta informasi perangkat. Setiap perubahan konfigurasi memicu reinisialisasi interpreter melalui PoseViewModel.
+Indikator warm-up (kelas WarmUpIndicator) ditampilkan di bagian atas layar dengan latar jingga selama 5 frame pertama setelah inisialisasi, memberikan umpan balik visual kepada peneliti bahwa sistem belum dalam kondisi stabil.
+Konfigurasi preview kamera menggunakan ScaleType.FIT_CENTER (bukan FILL_CENTER yang merupakan nilai default). Pemilihan ini penting: FILL_CENTER melakukan cropping pada tepi frame sehingga koordinat keypoints yang dihasilkan model tidak sesuai dengan posisi aktual pada tampilan, sedangkan FIT_CENTER mempertahankan seluruh konten frame dan menjamin akurasi overlay skeleton 100%.
+Implementasi Inferensi TFLite
+Pemuatan Model & Inisialisasi Delegate
+Panel kontrol (ControlPanel) dirancang dalam dua mode: collapsed dan expanded. Pada mode collapsed, hanya metrik FPS dan latensi yang ditampilkan bersama penghitung repetisi. Pada mode expanded, seluruh komponen pengujian tersedia: tiga dropdown selector untuk konfigurasi model, delegate, dan jenis latihan; panel metrik lengkap (latensi, FPS, CPU, memori, daya); panel latihan dengan sudut sendi aktual; panel logging dengan tombol Record/Stop dan Export CSV; serta informasi perangkat. Setiap perubahan konfigurasi memicu reinisialisasi interpreter melalui PoseViewModel.
+Indikator warm-up (kelas WarmUpIndicator) ditampilkan di bagian atas layar dengan latar jingga selama 5 frame pertama setelah inisialisasi, memberikan umpan balik visual kepada peneliti bahwa sistem belum dalam kondisi stabil.
+Konfigurasi preview kamera menggunakan ScaleType.FIT_CENTER (bukan FILL_CENTER yang merupakan nilai default). Pemilihan ini penting: FILL_CENTER melakukan cropping pada tepi frame sehingga koordinat keypoints yang dihasilkan model tidak sesuai dengan posisi aktual pada tampilan, sedangkan FIT_CENTER mempertahankan seluruh konten frame dan menjamin akurasi overlay skeleton 100%.
+fun initializeInterpreter(): TFLiteInitializationResult {
+    val modelBuffer = loadModelFile(modelFileName)
+    var options = Interpreter.Options()
+    var effectiveDelegateType = delegateType
+    var usedFallback = false
+
+    when (delegateType) {
+        CPU_BASELINE -> {
+            options.setNumThreads(4)
+            options.setUseXNNPACK(false)   // Tanpa XNNPACK — baseline murni
+        }
+        CPU_XNNPACK -> {
+            options.setNumThreads(4)
+            options.setUseXNNPACK(true)    // Aktifkan SIMD ARM NEON
+        }
+        GPU -> {
+            try {
+                gpuDelegate = GpuDelegate()
+                options.addDelegate(gpuDelegate)
+            } catch (e: Throwable) {
+                // Fallback ke XNNPACK jika GPU tidak kompatibel
+                options.setUseXNNPACK(true)
+                effectiveDelegateType = CPU_XNNPACK
+                usedFallback = true
+            }
+        }
+    }
+    interpreter = Interpreter(modelBuffer, options)
+    return TFLiteInitializationResult(interpreter, effectiveDelegateType, usedFallback)
+}
+Pada tingkat pertama (CPU Baseline), interpreter dijalankan menggunakan kernel bawaan TFLite tanpa optimasi XNNPACK, berfungsi sebagai acuan perbandingan. Tingkat kedua (XNNPACK) mengaktifkan instruksi SIMD ARM NEON untuk operasi aritmetika vektor yang lebih efisien. Tingkat ketiga (GPU) mendaftarkan objek GpuDelegate untuk mengalihkan komputasi ke GPU. Mekanisme fallback otomatis diterapkan: jika GPU gagal, sistem beralih ke XNNPACK dan mencatat nilai effectiveDelegateType yang sebenarnya ke dalam data CSV melalui kolom effective_delegate_type, sehingga analisis statistik dapat mengidentifikasi sesi yang tidak sesuai konfigurasi yang dimaksud.
+Antarmuka Detektor 
+Pergantian model secara dinamis difasilitasi menggunakan pola desain Strategy Pattern melalui antarmuka PoseDetector. Antarmuka ini mendefinisikan kontrak empat fungsi yang harus diimplementasikan oleh setiap detektor: detectPose(bitmap) untuk menjalankan inferensi, getInputSize() untuk mengembalikan dimensi masukan model, isClosed() untuk memeriksa status, dan close() untuk melepas sumber daya. Dengan abstraksi ini, PoseViewModel dan PoseImageAnalyzer tidak perlu mengetahui detail implementasi model yang sedang aktif.
+
+MoveNet Lightning Detector
+Kelas MoveNetDetector mengimplementasikan antarmuka PoseDetector untuk model MoveNet Lightning. Pra-pemrosesan citra menggunakan ImageProcessor dengan dua tahap: resize bilinear ke 192×192 piksel, diikuti normalisasi nilai piksel ke rentang [0, 1] menggunakan NormalizeOp(0f, 255f) khusus untuk input bertipe FLOAT32. Untuk input UINT8, normalisasi tidak diperlukan.
+Tensor keluaran MoveNet berformat [1, 1, 17, 3] yang merepresentasikan satu orang, 17 keypoints format COCO, dengan tiga nilai per keypoint: koordinat y ternormalisasi, koordinat x ternormalisasi, dan skor kepercayaan. Pose dinyatakan valid apabila rata-rata skor kepercayaan seluruh keypoints melebihi ambang batas 0,3.
+EMA (Exponential Moving Average) diterapkan pada koordinat keypoints untuk meredam jitter antar-frame. Koefisien adaptif digunakan: α = 0,4 untuk keypoints dengan skor ≥ 0,15, dan α = 0,1 untuk keypoints dengan skor rendah. Penggunaan α yang lebih kecil (bukan pembekuan penuh) pada keypoints berkepercayaan rendah merupakan perbaikan kritis dari implementasi sebelumnya — pembekuan penuh menyebabkan keypoints bagian bawah tubuh (pinggul, lutut, pergelangan kaki) terkunci di posisi berdiri selama gerakan squat, mengakibatkan algoritma penghitungan repetisi tidak dapat mendeteksi transisi state. Selain α adaptif, mekanisme deadband (ambang batas 0,008 dalam ruang ternormalisasi) diterapkan untuk mengabaikan pergerakan sub-piksel saat subjek diam.
+Untuk menangani situasi di mana pose tidak terdeteksi sesaat (skor rata-rata turun di bawah 0,3 secara temporer, yang sering terjadi pada fase terbawah gerakan squat karena foreshortening kamera depan), riwayat EMA tidak langsung direset. Riwayat baru dihapus setelah 10 kegagalan berturut-turut, sehingga sudut sendi tidak melompat drastis saat deteksi kembali.
+BlazePose Lite Detector
+Kelas BlazePoseDetector mengimplementasikan antarmuka PoseDetector untuk model BlazePose Lite dengan beberapa perbedaan fundamental dibandingkan MoveNet yang memerlukan penanganan khusus.
+Pra-pemrosesan citra. BlazePose memerlukan resolusi 256×256 piksel dengan normalisasi ke rentang [-1, 1] menggunakan NormalizeOp(127.5f, 127.5f). Inisialisasi buffer. Buffer output dialokasi sekali secara lazy pada frame pertama dan digunakan ulang pada setiap frame berikutnya (cachedOutputBuffer). Pendekatan ini menghindari pemanggilan ByteBuffer.allocateDirect() berulang yang menekan garbage collector dan menyebabkan stuttering pada tampilan.
+Jika model memiliki tensor keluaran kedua (global presence), inferensi dijalankan menggunakan runForMultipleInputsOutputs(). Nilai logit pada tensor kedua ditransformasi menggunakan fungsi sigmoid dan jika hasilnya di bawah 0,5, fungsi mengembalikan null tanpa mem-parsing seluruh keypoints — menghemat komputasi pasca-pemrosesan saat tidak ada orang di frame.
+Auto-deteksi rentang koordinat. Model BlazePose dapat mengeluarkan koordinat dalam rentang piksel [0, 256] atau ternormalisasi [0, 1] tergantung varian model. Sistem mendeteksi rentang ini secara otomatis pada 10 frame pertama dengan mengambil sampel tujuh keypoints kunci (hidung, bahu, pinggul, lutut) dan menentukan konsensus berdasarkan mayoritas nilai. Hasil deteksi disimpan sebagai coordsDivisor yang digunakan untuk normalisasi koordinat.
+Transformasi sigmoid pada visibility dan presence. BlazePose mengeluarkan nilai visibility dan presence sebagai logit (nilai kontinu tanpa batas), bukan probabilitas. Transformasi sigmoid σ(x) = 1 / (1 + e⁻ˣ) diterapkan untuk mengonversi keduanya ke rentang [0, 1]. Skor efektif per-keypoint dihitung sebagai nilai minimum antara visibility dan presence untuk menekan false positive.
+Pemetaan 33 ke 17 keypoints. BlazePose menghasilkan 33 keypoints (mencakup wajah detail, jari, dan kaki) sedangkan penelitian ini menggunakan 17 format COCO untuk konsistensi perbandingan dengan MoveNet. Pemetaan dilakukan menggunakan tabel konversi statis (COCO_TO_BLAZEPOSE) yang disajikan pada Tabel 5.2.
+Tabel 5.2 Pemetaan Indeks Keypoints BlazePose (33) ke Format COCO (17)
+Indeks COCO	Label	Indeks BlazePose	Label BlazePose
+0	nose	0	nose
+1	left_eye	2	left_eye
+2	right_eye	5	right_eye
+3	left_ear	7	left_ear
+4	right_ear	8	right_ear
+5	left_shoulder	11	left_shoulder
+6	right_shoulder	12	right_shoulder
+7	left_elbow	13	left_elbow
+8	right_elbow	14	right_elbow
+9	left_wrist	15	left_wrist
+10	right_wrist	16	right_wrist
+11	left_hip	23	left_hip
+12	right_hip	24	right_hip
+13	left_knee	25	left_knee
+14	right_knee	26	right_knee
+15	left_ankle	27	left_ankle
+16	right_ankle	28	right_ankle
+
+EMA smoothing pada BlazePoseDetector menggunakan parameter yang identik dengan MoveNetDetector (α = 0,4 normal, α = 0,1 low-confidence, deadband 0,008). Keseragaman ini penting untuk menjamin fairness perbandingan antar-model dalam analisis statistik.
+
+Pra-pemrosesan Citra dengan Letterbox Padding
+Konversi citra kamera ke format masukan model menggunakan teknik letterbox padding yang diimplementasikan dalam kelas PoseImageAnalyzer. Teknik ini dipilih karena mengatasi masalah distorsi koordinat yang terjadi ketika citra kamera (rasio 4:3 atau 16:9) diregangkan langsung ke dimensi persegi model (192×192 atau 256×256 piksel).
+// Hitung skala seragam agar seluruh citra muat dalam dimensi target
+val scale = min(targetW / srcW, targetH / srcH)
+val padX  = (targetW - srcW * scale) / 2f
+val padY  = (targetH - srcH * scale) / 2f
+
+// Gambar bitmap ke kanvas hitam (letterbox)
+val letterboxed = Bitmap.createBitmap(targetW, targetH, ARGB_8888)
+Canvas(letterboxed).apply {
+    drawColor(Color.BLACK)
+    drawBitmap(Bitmap.createScaledBitmap(source, scaledW, scaledH, true), padX, padY, null)
+}
+// Koreksi balik koordinat keypoint dari ruang letterbox ke ruang kamera asli
+fun correctLetterboxCoordinates(person: Person, lb: LetterboxResult): Person {
+    return Person(person.keypoints.map { kp ->
+        val pixelX = kp.x * lb.targetW
+        val pixelY = kp.y * lb.targetH
+        val relX   = (pixelX - lb.padX) / (lb.srcW * lb.scale)
+        val relY   = (pixelY - lb.padY) / (lb.srcH * lb.scale)
+        kp.copy(x = relX.coerceIn(0f, 1f), y = relY.coerceIn(0f, 1f))
+    }, person.score)
+}
+
+Metadata transformasi (faktor skala, offset padX dan padY, dimensi sumber dan target) disimpan dalam data kelas LetterboxResult dan digunakan oleh fungsi correctLetterboxCoordinates() untuk menginversi transformasi pada koordinat keypoints hasil inferensi. Konversi YUV dari CameraX menggunakan metode bawaan toBitmap() yang memanfaatkan libyuv secara internal — lossless dan lebih efisien 5–15 ms per frame dibandingkan jalur YUV→NV21→JPEG→Bitmap.
+Implementasi Algoritma Perhitungan Repetisi
+Algoritma penghitungan repetisi diimplementasikan menggunakan pendekatan state machine berbasis sudut sendi. Terdapat tiga komponen: kalkulator sudut, detektor squat, dan detektor push-up. Ketiganya mengimplementasikan antarmuka ExerciseDetector yang mendefinisikan kontrak analyzeFrame(), getRepetitionCount(), getCurrentAngle(), dan reset().
+Kalkulator Sudut
+Objek AngleCalculator menyediakan fungsi penghitungan sudut antara tiga titik keypoint menggunakan formula dot product. Sudut dihitung di titik tengah (vertex) melalui lima langkah: (1) membentuk dua vektor dari titik tengah ke titik pertama dan terakhir, (2) menghitung dot product, (3) menghitung magnitudo masing-masing vektor, (4) menerapkan invers kosinus (acos), dan (5) mengonversi dari radian ke derajat.
+fun calculateAngle(first: Keypoint, middle: Keypoint, last: Keypoint): Double {
+    val vA = Pair(first.x - middle.x,  first.y - middle.y)
+    val vB = Pair(last.x  - middle.x,  last.y  - middle.y)
+    val dot       = vA.first * vB.first + vA.second * vB.second
+    val magA      = sqrt((vA.first.pow(2) + vA.second.pow(2)).toDouble())
+    val magB      = sqrt((vB.first.pow(2) + vB.second.pow(2)).toDouble())
+    val cosAngle  = (dot / (magA * magB)).coerceIn(-1.0, 1.0)
+    return Math.toDegrees(acos(cosAngle))
+}
+
+Fungsi turunan tersedia untuk menghitung sudut lutut (menggunakan keypoints hip-knee-ankle) dan sudut siku (shoulder-elbow-wrist) pada kedua sisi tubuh. Fungsi getAverageKneeAngle() dan getAverageElbowAngle() mengembalikan rata-rata kedua sisi apabila keduanya terdeteksi, atau nilai sisi tunggal apabila hanya satu sisi yang memiliki skor kepercayaan di atas 0,2. Keypoints yang menghasilkan sudut di bawah 30° (lutut) atau 20° (siku) dibuang karena mengindikasikan posisi keypoints yang terlalu berdekatan atau bermasalah secara anatomis.
+Detektor Squat
+Kelas SquatDetector mengimplementasikan state machine empat-state dengan parameter sudut lutut sebagai input. Sudut mentah melalui moving average smoothing dengan ukuran jendela tiga frame sebelum dievaluasi untuk transisi state. Tabel 5.3 menyajikan ambang batas dan kondisi transisi antar-state.
+Tabel 5.3 Ambang Batas dan Transisi State Machine Squat
+State Asal	Kondisi Transisi	State Tujuan	Keterangan
+STANDING	θ < 145°	GOING_DOWN	Mulai turun (hysteresis exit)
+GOING_DOWN	θ ≤ 110°	SQUATTING	Mencapai kedalaman squat
+GOING_DOWN	θ > 160° (3 frame)	STANDING	Abort — batal turun
+SQUATTING	θ > 120° & hold ≥ 200ms	GOING_UP	Mulai naik
+GOING_UP	θ ≥ 160°	STANDING	+1 Rep tercatat
+GOING_UP	θ < 110°	SQUATTING	Turun kembali
+
+Tiga mekanisme pengamanan diimplementasikan: (1) Hysteresis threshold — setiap transisi menggunakan dua ambang batas berbeda (masuk dan keluar) untuk mencegah osilasi state akibat fluktuasi kecil sudut; (2) Abort confirmation — transisi pembatalan ke STANDING memerlukan 3 frame berturut-turut di atas 160° untuk mencegah satu frame noise mereset state machine; (3) Temporal constraint — durasi minimum 200 ms pada state SQUATTING untuk menghindari deteksi repetisi palsu akibat gerakan terlalu cepat.
+Detektor Push-Up
+Kelas PushUpDetector memiliki arsitektur serupa dengan SquatDetector tetapi menggunakan sudut siku sebagai parameter utama. State machine terdiri dari empat state: UP (lengan lurus, θ ≥ 140°), GOING_DOWN, DOWN (fase bawah, θ ≤ 115°), dan GOING_UP. Ambang batas ANGLE_UP_ENTER ditetapkan pada 140° (bukan 155° seperti rancangan awal) berdasarkan hasil observasi eksperimen: akibat efek foreshortening kamera depan dan lag EMA, gerakan push-up alami dari kamera depan sering membaca sudut siku maksimum hanya di 140–150°, sehingga ambang 155° menyebabkan banyak repetisi yang sebenarnya valid tidak terhitung.
+Ambang batas DOWN ditetapkan pada 115° (lebih toleran dari standar biomekanika 90°) karena akurasi deteksi sudut siku dari kamera umumnya lebih rendah dibandingkan sudut lutut, terutama saat posisi horizontal. Mekanisme abort confirmation (3 frame berturut-turut) dan durasi minimum 150 ms pada state DOWN juga diterapkan untuk menghindari deteksi ganda (double-counting).
+Implementasi Logging & Profilling
+Pengukuran Latensi Inferensi
+Pengukuran latensi dilakukan di dalam kelas PoseImageAnalyzer yang mengimplementasikan ImageAnalysis.Analyzer dari CameraX. Penanda waktu diambil menggunakan System.nanoTime() tepat sebelum dan sesudah pemanggilan poseDetector.detectPose(), kemudian selisihnya dibagi 1.000.000 untuk menghasilkan latensi dalam milidetik. Metode ini mengukur latensi inferensi murni tanpa menyertakan waktu pra-pemrosesan (konversi YUV, rotasi, letterbox) dan pasca-pemrosesan (koreksi koordinat).
+Selain latensi inferensi murni, end-to-end processing time (mencakup seluruh tahap dari penerimaan ImageProxy hingga pengiriman hasil ke ViewModel) juga diukur dan disimpan dalam kolom processing_time_ms di CSV. Kedua nilai ini dikirim ke ViewModel sebagai dua parameter terpisah untuk memungkinkan analisis overhead pra/pasca-pemrosesan.
+Protokol warm-up sebanyak 5 frame pertama diterapkan melalui penghitung totalFrameCount. Selama fase ini, nilai latensi dikirim sebagai 0 dan tidak dicatat oleh BenchmarkLogger. FPS dihitung menggunakan dua metode: rolling average per satu detik sebagai nilai utama, dan instantaneous FPS (1000 ms / delta antar-frame) sebagai nilai awal pada detik pertama sebelum data rolling tersedia.
+
+Profilling Sumber Daya
+Kelas ResourceProfiler mengukur tiga metrik sumber daya dengan interval polling 100 ms yang dilaksanakan pada thread yang sama dengan inferensi untuk meminimalkan latensi pembacaan.
+Utilisasi CPU diukur melalui pembacaan file sistem /proc/stat (total waktu CPU) dan /proc/[pid]/stat (waktu CPU proses aplikasi). Persentase dihitung dari delta waktu CPU aplikasi terhadap delta total waktu CPU, dikalikan jumlah inti prosesor. Mekanisme fallback menggunakan Process.getElapsedCpuTime() diterapkan untuk perangkat Android 8.0+ yang membatasi akses ke /proc/stat.
+Penggunaan memori diukur menggunakan Debug.MemoryInfo API yang menyediakan nilai Proportional Set Size (PSS) dalam kilobyte, kemudian dikonversi ke megabyte. PSS dipilih sebagai metrik karena merepresentasikan penggunaan memori aktual aplikasi dengan memperhitungkan pembagian memori antar-proses secara proporsional, berbeda dengan RSS (Resident Set Size) yang menghitung seluruh memori yang dipetakan tanpa mempertimbangkan pembagian.
+Konsumsi daya diestimasi menggunakan BatteryManager API dengan formula P(mW) = V(mV) × I / faktor, di mana faktor bergantung pada unit arus yang dikembalikan perangkat. Heuristik diterapkan: jika nilai arus absolut < 50.000, dianggap dalam satuan miliampere (mA) sehingga faktor 1.000; jika ≥ 50.000, dianggap dalam mikroampere (µA) sehingga faktor 1.000.000. Nilai ini dicatat sebagai metrik deskriptif dan tidak dimasukkan ke dalam analisis ANOVA karena keterbatasan granularitas sensor baterai.
+Pencatatan & Ekspor CSV
+Kelas BenchmarkLogger mengelola pencatatan metrik secara thread-safe menggunakan tiga primitif atomik: AtomicBoolean untuk flag isLogging, AtomicInteger untuk penghitung frame, dan AtomicLong untuk penanda waktu mulai/selesai. Data disimpan dalam  ConcurrentLinkedQueue<BenchmarkMetrics> yang aman diakses secara bersamaan dari camera thread (logMetrics) dan UI thread (start/stop/export) tanpa risiko race condition.
+Label sesi dibuat secara otomatis dalam format [Model]_[Delegate]_[Latihan] (contoh: MoveNet_GPU_SQUAT). Apabila terjadi fallback delegate GPU ke XNNPACK, label menyertakan informasi ini: MoveNet_GPU_AS_XNNPACK_SQUAT, sehingga setiap baris data dalam CSV dapat diidentifikasi kondisi eksperimen aktualnya tanpa ambiguitas.
+Ekspor data menggunakan MediaStore API (Android 10+) atau akses penyimpanan eksternal langsung untuk versi sebelumnya. Statistik ringkasan sesi (BenchmarkSummary) dihitung saat logging dihentikan, mencakup rata-rata, simpangan baku, minimum, dan maksimum latensi inferensi, rata-rata FPS/CPU/memori/daya, serta detection rate (persentase frame dengan pose terdeteksi).
+Integrasi Komponen Melalui ViewModel
+Seluruh komponen yang telah diuraikan di atas diintegrasikan melalui kelas PoseViewModel yang mengikuti pola arsitektur MVVM. ViewModel bertindak sebagai orkestrator yang mengoordinasikan aliran data antara lapisan presentasi, domain, dan data, serta menjaga state aplikasi melalui PoseUiState yang didistribusikan menggunakan StateFlow.
+PoseUiState merangkum seluruh informasi yang diperlukan oleh antarmuka: model dan delegate terpilih (termasuk effectiveDelegate yang mencatat nilai aktual setelah kemungkinan fallback), hasil deteksi pose, metrik performa, data latihan, status logging, status warm-up, pesan kesalahan, dan jalur file ekspor terakhir.
+Setiap perubahan konfigurasi (model, delegate, atau jenis latihan) memicu siklus reinisialisasi pada background thread (Dispatchers.IO): melepas interpreter lama, membuat TFLiteHelper baru, menginisialisasi interpreter, mereset fase warm-up, dan memperbarui PoseUiState dengan hasil inisialisasi termasuk nilai effectiveDelegateType.
+Fungsi updateResults() dipanggil oleh PoseImageAnalyzer setiap frame untuk memperbarui state UI. Fungsi ini menjalankan tiga operasi berurutan: (1) memperbarui metrik performa, (2) menjalankan ExerciseDetector jika latihan dipilih, dan (3) mencatat data ke BenchmarkLogger apabila sesi logging aktif dan fase warm-up telah selesai. Data yang dicatat menyertakan nilai effectiveDelegateType dari state saat itu untuk memastikan setiap baris CSV mencerminkan kondisi aktual eksperimen.
 
 
-
-
-
-PENGEMBANGAN APLIKASI
-Bab ini fokus pada "Bagaimana sistem ini dibangun" berdasarkan rancangan di Bab 4.
-	5.1 Lingkungan Pengembangan: Menjelaskan detail tools yang beneran lu pake, seperti Android Studio versi tertentu, versi Kotlin, dan konfigurasi Gradle (minSdk 25, targetSdk 34) .
-	5.2 Realisasi Antarmuka Pengguna (UI): Menampilkan hasil jadi dari wireframe Bab 4, mulai dari layar konfigurasi model hingga layar monitoring real-time .
-	5.3 Implementasi Logika Inferensi TFLite: Menjelaskan bagian kode untuk memuat model (.tflite), inisialisasi delegate (CPU, GPU, XNNPACK), dan proses running interpreter .
-	5.4 Implementasi Algoritma Repetisi: Menjelaskan bagaimana State Machine (UP/DOWN) dikonversi menjadi kode untuk menghitung squat dan push-up .
-	5.5 Implementasi Pengukuran Metrik & Logging: Menjelaskan bagian kode yang menggunakan System.nanoTime() untuk latensi dan bagaimana data tersebut ditulis ke file CSV .
-	BAB VI: PENGUJIAN DAN PEMBAHASAN
-Bab ini adalah "nyawa" dari penelitian lu, di mana data bicara.
-	6.1 Prosedur Pengujian: Menjelaskan langkah-langkah saat lu ambil data di Samsung A06 dan A33, termasuk protokol warm-up 5 frame .
-	6.2 Hasil Pengujian Performa (Benchmarking):
-	6.2.1 Analisis Latensi dan Throughput (FPS): Sajian grafik perbandingan antar delegate .
-	6.2.2 Analisis Utilisasi Sumber Daya: Data penggunaan CPU dan RAM.
-	6.2.3 Analisis Konsumsi Daya: Estimasi penggunaan baterai selama inferensi .
-	6.3 Pengujian Akurasi Fungsional: Tabel perbandingan hitungan repetisi aplikasi vs manual (ground truth) .
-	6.4 Analisis Statistik (ANOVA): Hasil uji signifikansi untuk menentukan apakah perbedaan performa antar delegate itu nyata atau cuma kebetulan.
-	6.5 Pembahasan Mendalam (Deep Dive): Lu bahas "Kenapa" hasilnya begitu. Misalnya, kenapa GPU di Helio G85 (A06) tidak secepat yang dibayangkan dibanding XNNPACK.
-	BAB VII: PENUTUP
-Karena ada penambahan bab, maka penutup pindah ke Bab 7.
-	7.1 Kesimpulan: Menjawab rumusan masalah .
-	7.2 Saran: Masukan untuk pengembangan ke depan .
-
-Pembahasan berfungsi untuk menerjemahkan makna dari hasil yang diperoleh untuk menjawab pertanyaan atau masalah penelitian. Fungsi lainnya adalah untuk menjelaskan pemahaman baru yang didapatkan dari hasil penelitian, yang diharapkan berguna dalam pengembangan keilmuan. Dalam penelitian tingkat lanjut, fungsi pembahasan yang kedua ini sangat penting karena dapat menunjukkan kontribusi penulis terhadap pengembangan keilmuan. Akan tetapi, dalam penelitian tingkat skripsi, fungsi yang kedua ini dapat diterapkan secara terbatas karena pendidikan S1 tidak dituntut untuk pengembangan keilmuan secara substansial, tetapi cukup terhadap pemahaman personal dalam implementasi konsep atau teori. 
-Implementasi Sistem
-Hasil Pengujian
-Pembahasan
-Analisis Performa Delegate (Menjawab Rumusan Masalah 1)
-Analisis Perbandingan Model (Menjawab Rumusan Masalah 2)
-Analisis Keseimbangan (Trade-off) (Menjawab Rumusan Masalah 3)
-Dalam menjawab masalah penelitian, penulis diminta untuk melakukan evaluasi kritis terhadap hasil yang diperoleh. Tergantung dari fokus penelitian, beberapa contoh pertanyaan kritis yang dapat dijawab adalah: 
-Seberapa jauh tujuan penelitian telah tercapai?
-Apakah aplikasi atau sistem yang dibangun sesuai dengan tujuannya?
-Apakah metode atau praktik perancangan dan implementasi yang baik telah dijalankan?
-Apakah teknologi implementasi yang tepat telah dipilih? Dan sebagainya.
-Subbab Lima Satu Satu
-Dalam menjelaskan pemahaman baru yang didapatkan, penulis dapat mengubungkan hasil penelitian dengan pengetahuan teoritik atau penelitian sebelumnya yang telah dibahas. Kaitan antara hasil penelitian dan pengetahuan teoritik misalnya berupa:
-pendapat tentang metode yang digunakan dari pustaka, apakah dapat digunakan dengan baik secara langsung, dengan penyesuaian, atau dengan batasan tertentu;
-konfirmasi tentang batasan dari metodologi yang digunakan sehingga dapat berpengaruh pada hasil;
-penjelasan tentang informasi penting pada penelitian lainnya yang membantu penulis untuk menerjemahkan data penelitian penulis; 
-penjelasan tentang kemungkinan hasil dari penelitian lainnya yang dapat dikombinasikan dengan penelitian penulis untuk memberikan pengetahuan baru; dan sebagainya.
-Subbab Lima Satu Dua
-Penulis dapat merefleksikan apa yang telah dipelajari selama melakukan penelitian, tetapi harus tetap terfokus dengan masalah penelitian ini dan tidak melebar ke masalah lainnya. Hal-hal yang berada di luar fokus peneltian tetapi penting dan menarik untuk diteliti dapat disarankan sebagai bahan penelitian berikutnya. Hal ini dapat dipertegas di bab Kesimpulan/ Penutup. 
-Subbab Lima Dua
-Hasil dan pembahasan dapat diletakkan dengan kemungkinan berikut:
-	Dipisahkan secara fisik ke dalam bab-bab yang berbeda
-Dipisahkan secara fisik ke dalam dua atau lebih paragraf atau subbab yang berbeda tetapi dalam bab yang sama
-Dileburkan menjadi satu dalam paragraf, dijelaskan secara naratif-deskriptif, terdistribusi ke satu atau lebih bab yang ada
-Subbab Lima Dua Satu
-Cara pertama atau kedua membantu pembaca yang ingin memisahkan observasi dan terjemahan dari observasi tersebut sehingga mereka dapat menilai kualitas dari masing-masing proses dengan lebih mudah. Kadang-kadang cara kedua lebih banyak dipilih daripada cara pertama jika data yang harus dipresentasikan yang cukup banyak dan laporan penelitian cukup panjang agar pembaca tidak perlu menunggu presentasi dari seluruh data selesai baru dapat membaca penerjemahannya. Cara pertama dan kedua ini banyak digunakan untuk penelitian yang bersifat kuantitatif, baik itu deskriptif, eksplanatori, maupun implementatif.    
-Subbab Lima Dua Dua
-Cara ketiga biasanya digunakan jika data, analisis, dan penafsirannya sulit dipisahkan. Pemisahannya terkadang justru membuat laporan penelitian sulit dibaca. Hal ini dapat berlaku pada tipe penelitian yang bersifat kualitatif, baik itu deskriptif ataupun analitik/eksplanatori. 
-Pada dasarnya peletakan dan jumlah bab untuk hasil dan pembahasan sebaiknya disesuaikan karakter penelitian masing-masing. Judul bab pun tidak harus secara eksplisit “Hasil” dan “Pembahasan” tetapi dapat digantikan dengan nama yang lebih deskpritif dan tematik. 
-Subbab Lima Tiga
-Contoh struktur skripsi untuk implementatif pembangunan dan nonimplementatif eksperimental dapat dilihat pada kedua subbab berikut. 
-Contoh Struktur Penelitian Implementatif Pembangunan
-Berikut ini adalah contoh bab-bab yang terdapat pada penelitian implementatif pembangunan sistem perangkat lunak. 
-Bab 1 Pendahuluan
-Bab 2 Landasan Kepustakaan
-Bab 3 Metodologi Penelitian
-Bab 4 Persyaratan 
-Bab 5 Perancangan dan Implementasi
-Bab 6 Pengujian 
-Bab 7 Penutup
-Bab 1 sampai Bab 3 memuat informasi yang sesuai dengan panduan sebelumnya. Isi dari bab-bab berikutnya: 
-Bab 4 Persyaratan: 
-Pernyataan masalah (problem statement), yang lebih elaboratif daripada yang di Pendahuluan. 
-Identifikasi pemangku kepentingan (stakeholders) dan aktor (actors) sistem. 
-Daftar terstruktur persyaratan/kebutuhan perangkat lunak, secara fungsional, data, dan non-fungsional
-Use cases, use case diagrams, dan use case specifications, dan sebagainya. 
-Bab 5 Perancangan dan Implementasi:
-Rancangan arsitektur: deskripsi struktur dan setiap komponen utama  
-Representasi data dalam model data dan basis data 
-Detil implementasi dari fungsi-fungsi utama yang menjadi fokus
-Bab 6 Pengujian dan Evaluasi
-Strategi, rencana, kasus, dan data pengujian
-Ringkasan hasil pengujian perangkat lunak, termasuk data dan analisisnya (detilnya di Lampiran)
-Evaluasi hasil proyek secara keseluruhan, misalkan 
-Bab 7 Penutup
-Ringkasan dari capaian proyek
-Saran pengembangan lebih lanjut
-Pada contoh struktur ini “hasil” tersebar di beberapa bab mulai Bab 4 Persyaratan sampai Bab 6, sedangkan “pembahasan” secara keseluruhan terhadap masalah penelitian terdapat di Bab 6. Yang dimaksud dengan pengujian dalam Bab 6 terfokus pada pengujian persyaratan perangkat lunak, sedangkan evaluasi berfungsi sebagai “pembahasan” secara keseluruhan, yaitu menentukan apakah “hasil” sudah menjawab masalah penelitian yang dirumuskan pada Bab 1. 
-Sebagai catatan, Bab 3 Metodologi umumnya menjelaskan model proses perangkat lunak yang digunakan. Jika strategi untuk setiap aktivitasnya (analisis persyaratan, perancangan, dan seterusnya) sudah dijelaskan di Bab 3 ini juga, maka bab-bab lainnya yang berhubungan dengan aktivitas-aktivitas ini masing-masing langsung dapat menjelaskan hasil pelaksanaan metodenya. 
-Contoh Struktur Penelitian Nonimplementatif Eksperimental
-Berikut ini adalah contoh bab-bab yang terdapat pada penelitian implementatif pembangunan sistem perangkat lunak. 
-Bab 1 Pendahuluan
-Bab 2 Landasan Kepustakaan
-Bab 3 Metodologi Penelitian
-Bab 4 Hasil 
-Bab 5 Pembahasan
-Bab 6 Penutup
-Isi dari setiap bab dapat menyesuaikan dengan panduan yang telah dijelaskan sebelumnya. Jika diperlukan, Bab 4 dapat digabungkan dengan Bab 5, menjadi Hasil dan Pembahasan. 
-Struktur dasar ini cukup universal sehingga dapat digunakan juga untuk tipe-tipe penelitian lainnya, khususnya jika belum ada struktur lain yang lebih tematik dan cocok untuk penelitian yang bersangkutan.
+PENGUJIAN DAN PEMBAHASAN
+Persiapan Pengujian
+Statistik Deskriptif
+Validasi Fungsional Penghitungan Repetisi
+Uji Asumsi ANOVA
+Analisis Varians (Three-Way ANOVA)
+Latensi Inferensi
+Utilisasi CPU
+Penggunaan Memori
+Ringkasan Signifikansi
+Uji Post-hoc Tukey HSD
+Analisis Trade-off Deskriptif
+Kriteria Kelayakan Real-time
+Profil Trade-off Kualitatif
+Rekomendasi Per Skenario
+Pembalhasan
+Pengaruh Delegate Terhadap Kinerja 
+Perbandingan Model
+Pengaruh Jenis Latihan
+Konfigurasi Optimal
 Penutup
-Bagian ini memuat kesimpulan dan saran terhadap skripsi. Kesimpulan dan saran disajikan secara terpisah, dengan penjelasan sebagai berikut: 
 Kesimpulan 
-Kesimpulan merupakan pernyataan-pernyataan yang singkat, jelas, dan tepat tentang hasil penelitian yang diperoleh berdasarkan tujuannya. Bagian ini merupakan penegasan dari yang telah dijelaskan pada bagian Pembahasan dan tidak memuat informasi yang baru.  Bagian ini juga mencerminkan jawaban dari rumusan masalah (pertanyaan penelitian).
 Saran
-Saran berisi pernyataan-pernyataan yang ringkas dan jelas tentang masalah-masalah atau hal-hal yang dapat dilakukan untuk mengembangkan penelitian ini lebih lanjut. Saran itu dapat diarahkan pada aspek metode, instrumen, populasi/sampel, dan sebagainya.
 DAFTAR REFERENSI
-Adobe Systems Incorporated, 2013. Adobe Air (3.5 beta). [program komputer] Adobe Labs. Tersedia di: <http://labs.adobe.com/technologies/
-flashruntimes/air/> [Diakses 1 Mei 2013]
-Alif, A., 2013. Komputasi cerdas untuk pemula. Malang: ABC Press.
-Angriawan, B., 2014. Sistem pakar untuk penentuan kondisi tubuh ideal atlet sepakbola usia remaja. S1. Universitas Malang Raya. 
-Berndtsson, M., Hansson, J., Olsson, B. & Lundell, B., 2008. Thesis projects: a guide for students in Computer Science and Information Systems. 2nd ed. London: Springer-Verlag London Limited.
-Boots Group Plc., 2003. Corporate social responsibility. [online] Boots Group Plc. Tersedia di: <http://www.boots-plc.com/information/info.asp?id1=1a> [Diakses 1 April 2004]
-Brata, K.C., 2012. Rancang bangun aplikasi jejaring sosial kampus berbasis GPS pada ponsel cerdas Android. S1. Universitas Brawijaya. Tersedia di <http://ptiik.ub.ac.id/skripsi> [Diakses 1 Agustus 2014]
-British Standards Institution, 2011. BS EN 594:2011 Timber structures. Test methods. Racking strength and stiffness of timbre frame wall panels. British Standards Online [online] Tersedia melalui: Anglia Ruskin University Library <http://libweb.anglia.ac.uk> [Diakses 31 Augustus 2011]
-Brodjonegoro, A., 2009a. Dunia teknologi informasi bagi komunitas open source. Bandung: Bandung Indah Press.
-Brodjonegoro, A., 2009b. Peran media sosial dalam pemasaran produk perangkat lunak. Bandung: Bandung Indah Press.
-Broughton, J.M., 2002a. The Brettow Woods proposal: a brief look. Political Science Quarterly, 42(6), p.564. 
-Broughton, J.M., 2002b. The Brettow Woods proposal: a brief look. Political Science Quarterly, [e-journal] 42(6). Tersedia melalui: Perpustakaan Universitas BX <http://perpustakaan.ubx.ac.id> [Diakses 1 Juli 2013] 
-Brown, J. 2005. Evaluating surveys of transparent governance. In: UNDESA (United Nations Department of Economic and Social Affairs), 2005. 6th Global forum for reinventing government: towards participatory dan transparent governance. Seoul, Republic of Korea, 24-27 May 2005. New York: United Nations.
-Cakraningrat, R., 2011. Sistem pendukung keputusan untuk UMKM. [e-book]. UBX Press. Tersedia melalui: Perpustakaan Universitas BX <http://perpustakaan.ubx.ac.id> [Diakses 1 Juli 2013] 
-Cookson, J. dan Church, S. eds., 2007. Leisure and the tourist. [e-book] Wallingford: ABS Publishers. Tersedia di: Google Books <http://booksgoogle.com> [Diakses 1 Juli 2009] 
-Cox, C., Brown, J.T. dan Tumpington, W.T., 2002. What health care assistants know about clean hands. Nursing Today, Spring Issue, pp.64-68.
-Diponegoro, A., 2008. The beauty of Indonesian oceans. [electronic print] Tersedia di: <http://adiponegoro.com/store/product_info.php?cPath=3&
-productss_id=99> [Diakses 1 Januari 2011] 
-Esemka, 2012. Esemka bisa. [image online] Tersedia di: <http://www.esemka.co.id/esemkabisa.aspx> [Diakses 31 Januari 2011]
-Goalie, D. 2008. Remote sensing technology for modern soccer. Popular science and Technology, [online] Tersedia di: <http://www.popsci.com/b012378/
-soccer.html> [Diakses 1 Juli 2009] 
-Haryanto, A. 2002. Dua dunia. [foto] (Koleksi pribadi Alan Haryanto) 
-Higher Education Act 2004. (c.8). London: HMSO
-International Standards Office, 1998. ISO 690 – 2 Information and documentation: Bibliographical references: Electronic documents. Geneva: ISO.
-Kartolo, R., 2010. Wawancara pada Kabar Pagi. Diwawancara oleh Sam Basman [televisi] TVRI Saluran 1, 17 Agustus 2010, 08:30.
-Keene, E., ed., 1988. Natural language. Cambridge: University of Cambridge Press.
-Kementerian Komunikasi dan Informatika, 2013. Laporan Tahunan Layanan Informasi Publik Tahun 2012. [pdf] Kementerian Komunikasi dan Informatika. Tersedia di: <http://publikasi.kominfo.go.id/bitstream/handle/
-54323613/976/laporan-dan-evaluasi-ppid-tahun-2012-ditambahkan-cover-untuk-online-ppid.pdf> [Diakses 1 Agustus 2014]
-NHS Evidence, 2003. National Library of Guidelines. [online] Tersedia di: <http://www.library.nhs.uk/guidelinesfinder> [Diakses 1 Juli 2007]
-Rahardjo, S. 2001. Presiden Habibie. [foto] (Jakarta, Koleksi Museum Presiden)
-Richmod, J., 2005. Customer expectations in the world of elctronic banking: a case study of the Bank of Britain. PhD. Anglia Ruskin University. 
-Rumbaugh, J., Jacobson, I. & Booch, G., 2005. The Unified Modeling Language reference manual. 2nd ed. Boston: Addison-Wesley.
-Samson, C., 1970. Problems of information studies in history. Dalam: S. Stone, ed. 1980. Humanities information research. Sheffield: CRUS. pp. 44-68. 
-Scottish Intercollegiate Guidelines, 2001. Hypertension in the elderly. (SIGN publication 20) [online] Edinburgh: SIGN (Diterbitkan 2001) Tersedia di:<http://www.sign.ac.uk/sign49.pdf> [Diakses 22 November 2004]
-Silverman, D.F. dan Propp, K.K. eds., 1990. The active interview. BeverlyHills, CA: Sage.
-Smith, J., 1975. A source of information. Dalam: W. Jones, ed. 2000. One hundred and one ways to find information about health. Oxford: Oxford University Press. Ch.2.
-Sommerville, I., 2011. Software engineering. 9th ed. London: Addison-Wesley.
-Sudirman, Z., 2011. Pembahasan tentang sitasi dan perujukan. [surat] (Komunikasi personal, 11 Juni 2011). 
-Tanenbaum, A.S., 1998. Organisasi komputer terstruktur, jilid 1. Diterjemahkan dari Bahasa Inggris oleh T.A.H Al-Hamdany. 2001. Jakarta: Salemba Teknika.
-Thompson, A. dan Thomson, B., (in press) Innocent or guilty: a studi to ascertain the status of convicts in highly uncertain situations. Journal of Crime Scene Investigation. (Diterima untuk publikasi Januari 2002). 
-Undang-undang Republik Indonesia nomor 12 tahun 2012 tentang Pendidikan Tinggi. Jakarta: Kementerian Sekretariat Negara Republik Indonesia.
-UNDESA (United Nations Department of Economic and Social Affairs), 2005. 6th Global forum for reinventing government: towards participatory dan transparent governance. Seoul, Republic of Korea, 24-27 May 2005. New York: United Nations. 
-	[1] Grand View Research. (2024). Fitness App Market Size, Share & Trends Analysis Report. Retrieved from https://www.grandviewresearch.com/industry-analysis/fitness-app-market
-	[2] Market Research. (2025). Fitness App Market Size, Share & Trends Analysis Report By Type. Retrieved from https://www.marketresearch.com/Grand-View-Research-v4060/Fitness-App-Size-Share-Trends-42906284/
-	[3] Straits Research. (2023). Fitness App Market: Country Insights. Retrieved from https://straitsresearch.com/report/fitness-app-market
-	[4] Detik Inet. (2023, Juni 1). Pasar Smartphone Indonesia Turun 11,9% di Kuartal I 2023. Retrieved from https://inet.detik.com/business/d-6751251/pasar-smartphone-indonesia-turun-11-9-di-kuartal-i-2023
-	[5] Katadata. (2023, Juni 4). Laporan IDC: Pasar Smartphone Indonesia Merosot 11.9% Kuartal I 2023. Retrieved from https://katadata.co.id/digital/gadget/647d9f4c3ed6f/laporan-idc-pasar-smartphone-indonesia-merosot-119-kuartal-i-2023
-	[6] Selular.ID. (2023, Mei). IDC: Top 5 Brand Smartphone di Indonesia Q1-2023. Retrieved from https://selular.id/2023/05/idc-top-5-brand-smartphone-di-indonesia-q1-2023-oppo-bukan-1/
-	[7] Chen, S., & Yang, R. R. (2020). Pose Trainer: Correcting Exercise Posture using Pose Estimation. arXiv:2006.11718 [cs.CV]. Retrieved from https://arxiv.org/abs/2006.11718
-	[8] Tharatipyakul, A., et al. (2024). Deep Learning-Based Human Body Pose Estimation in Healthcare Applications. Heliyon. Retrieved from https://www.sciencedirect.com/science/article/pii/S2405844024126205
-	[9] Appiah, K. E., et al. (2024). A Mobile-Phone Pose Estimation for Gym-Exercise Form Correction and Feedback Delivery. VISAPP 2024 Conference Proceedings. Retrieved from https://eprints.whiterose.ac.uk/id/eprint/210366/1/VISAPP_2024_266_CR.pdf
-	[10] Hede, S., et al. (2024). Human Pose Estimation & Correction During Exercise and Movement Analysis. International Journal of Scientific Research and Engineering Technology (IJSRET). Retrieved from https://ijsret.com/wp-content/uploads/IJSRET_V11_issue3_1052.pdf
-	[11] TensorFlow Blog. (2021, Agustus 15). Pose Estimation and Classification on Edge Devices with MoveNet and TensorFlow Lite. Retrieved from https://blog.tensorflow.org/2021/08/pose-estimation-and-classification-on-edge-devices-with-MoveNet-and-TensorFlow-Lite.html
-	[12] TensorFlow Lite. (2024, Januari 15). Pose Estimation Overview. Retrieved from https://www.tensorflow.org/lite/examples/pose_estimation/overview
-	[13] Bazarevsky, V., & Grishchenko, I. (2020). On-Device, Real-Time Body Pose Tracking with MediaPipe BlazePose. Google Research Blog. Retrieved from https://research.google/blog/on-device-real-time-body-pose-tracking-with-mediapipe-blazepose/
-	[14] Raju, K. (2022). Exercise Detection and Tracking Using MediaPipe BlazePose with Spatial-Temporal Graph Convolutional Networks. Dublin City University Thesis. Retrieved from https://norma.ncirl.ie/6272/1/krishnanunniraju.pdf
+Blog, T., 2021. Pose estimation and classification on edge devices with MoveNet and TensorFlow Lite — The TensorFlow Blog. [online] Available at: <https://blog.tensorflow.org/2021/08/pose-estimation-and-classification-on-edge-devices-with-MoveNet-and-TensorFlow-Lite.html> [Accessed 5 March 2026].
+Chen, S. and Yang, R.R., 2020. Pose Trainer: Correcting Exercise Posture using Pose Estimation. [online] Available at: <http://arxiv.org/abs/2006.11718>.
+DetikInet, 2023. Pasar Smartphone Indonesia Turun 11,9% di Kuartal I 2023. [online] Available at: <https://inet.detik.com/business/d-6751251/pasar-smartphone-indonesia-turun-11-9-di-kuartal-i-2023> [Accessed 5 March 2026].
+Essuming, K., 2024. A Mobile-Phone Pose Estimation for Gym-Exercise Form Correction. Proceedings, Joint Conference on Computer Vision, Imaging and Computer Graphics Theory and Applications., [online] pp.559–566. Available at: <https://eprints.whiterose.ac.uk/210366/>.
+Ignatov, A., Timofte, R., Chou, W., Ke Wang, M.W., Hartley, T. and Gool, L. Van, 2018. AI Benchmark: Running Deep Neural Networks on Android Smartphones. Proceedings of the European Conference on Computer Vision (ECCV), 11133, pp.288–314.
+Jiang, S., Ran, L., Cao, T., Xu, Y. and Liu, Y., 2020. Profiling and optimizing deep learning inference on mobile GPUs. APSys 2020 - Proceedings of the 2020 ACM SIGOPS Asia-Pacific Workshop on Systems, pp.75–81. https://doi.org/10.1145/3409963.3410493.
+Katadata, 2023. Laporan IDC: Pasar Smartphone Indonesia Merosot 11.9% Kuartal I 2023 - Gadget Katadata.co.id. [online] Available at: <https://katadata.co.id/digital/gadget/647d9f4c3ed6f/laporan-idc-pasar-smartphone-indonesia-merosot-119-kuartal-i-2023> [Accessed 5 March 2026].
+Lee, J., Chirkov, N., Ignasheva, E., Pisarchyk, Y., Shieh, M., Riccardi, F., Sarokin, R., Kulik, A. and Grundmann, M., 2019. On-Device Neural Net Inference with Mobile GPUs. [online] Available at: <http://arxiv.org/abs/1907.01989>.
+Lite, T., 2024. examples/lite/examples/pose_estimation at master · tensorflow/examples. [online] Available at: <https://github.com/tensorflow/examples/tree/master/lite/examples/pose_estimation> [Accessed 5 March 2026].
+Selular.ID, 2023. IDC: Top 5 Brand Smartphone di Indonesia Q1-2023, Oppo Bukan #1 | Selular.ID. [online] Available at: <https://selular.id/2023/05/idc-top-5-brand-smartphone-di-indonesia-q1-2023-oppo-bukan-1/> [Accessed 5 March 2026].
+Tharatipyakul, A., Srikaewsiew, T. and Pongnumkul, S., 2024. Deep learning-based human body pose estimation in providing feedback for physical movement: A review. Heliyon, [online] 10(17), p.e36589. https://doi.org/10.1016/j.heliyon.2024.e36589.
+Valentin Bazarevsky and Ivan Grishchenko, 2020. On-device, Real-time Body Pose Tracking with MediaPipe BlazePose. [online] Available at: https://research.google/blog/on-device-real-time-body-pose-tracking-with-mediapipe-blazepose/> [Accessed 6 March 2026].
 
-PERSYARATAN FISIK DAN TATA LETAK
-Kertas
-Kertas yang digunakan adalah HVS 70 mg berukuran A4. Apabila terdapat gambar-gambar yang menggunakan kertas berukuran lebih besar dari A4, hendaknya dilipat sesuai dengan aturan yang berlaku. Pengetikan hanya dilakukan pada satu muka kertas, tidak bolak balik. 
-Margin
-Batas pengetikan naskah adalah sebagai berikut :
-Margin kiri: 4 cm
-Margin atas: 3 cm
-Margin kanan: 3 cm 
-Margin bawah: 3 cm 
-Jenis dan Ukuran Huruf 
-Jenis huruf yang dipakai dalam skripsi adalah Calibri dengan ketentuan sebagai berikut:
-Judul bab pada level 1 berukuran 16 pt
-Judul subbab pada level 2 berukuran 14 pt
-Judul subbab pada level 3 berukuran 14 pt
-Judul subbab pada level 4 berukuran 12 pt
-Badan teks berukuran 12 pt
-Penggunaan jenis dan ukuran ini harus konsisten. Untuk memudahkan memelihara konsistensi sekaligus penyusunan struktur skripsi, fasilitas seperti styles dan multilevel list dalam program pengolah kata dapat digunakan. Sebuah template untuk skripsi ini telah disediakan untuk membantu mahasiswa. Styles dan multilevel list dalam template tersebut sudah dirancang untuk jenis dan ukuran huruf yang disyaratkan.  
-Spasi
-Jarak  standar antar  baris  dalam  badan teks adalah satu spasi.  Jarak antar paragraf, antara judul bab dan judul subbab, antara judul subbab dan badan teks, dan seterusnya, dapat dilihat pada masing-masing style yang digunakan dan tersedia dalam template untuk skripsi ini. 
-Kepala Bab dan Subbab 
-Kepala bab terdiri dari kata “BAB” yang diikuti dengan nomor bab dan judul dari bab tersebut, misalnya “BAB 1 PENDAHULUAN” . Kepala subbab diawali dengan nomor sesuai tingkat hirarkinya dan diikuti dengan judul subbab, misalnya “1.2 Rumusan masalah”. Penomoran subbab disarankan tidak lebih dari 4 level (maksimal subbab X.X.X.X). Kepala bab dan subbab tidak boleh mengandung widow atau orphan sehingga nampak menggantung atau terputus di bagian awal atau akhir sebuah halaman. Widow adalah sebuah paragraf dengan hanya satu baris pertama pada akhir halaman sedangkan sisanya berada pada halaman berikutnya. Orphan adalah baris terakhir dari satu paragraf yang tertulis pada awal suatu halaman sedangkan baris lainnya dari paragraf tersebut berada pada halaman sebelumnya. 
-Nomor Halaman
-Bagian   awal   skripsi   menggunakan   nomor   halaman berupa angka Romawi kecil (i, ii, iii, iv, dan seterusnya) yang dimulai dari sampul dalam. Sedangkan bagian utama dan bagian akhir skripsi menggunakan nomor halaman berupa angka Arab (1, 2, 3, dan seterusnya) yang dimulai dari bab 1. Semua nomor halaman diletakkan di tengah bawah. 
 
+ 

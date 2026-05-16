@@ -31,14 +31,16 @@ fun PoseVisualization(
         person: Person?,
         viewWidth: Float,
         viewHeight: Float,
+        sourceAspectRatio: Float? = null,
         formFeedback: FormFeedback? = null,
         debugMode: Boolean = false,
         modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier.fillMaxSize()) {
         person?.let {
-            drawPoseSkeleton(it, viewWidth, viewHeight, formFeedback)
-            if (debugMode) drawDebugLabels(it, viewWidth, viewHeight)
+            val transform = calculateFitCenterTransform(viewWidth, viewHeight, sourceAspectRatio)
+            drawPoseSkeleton(it, transform, formFeedback)
+            if (debugMode) drawDebugLabels(it, transform)
         }
     }
 }
@@ -46,7 +48,7 @@ fun PoseVisualization(
 // Threshold minimum keypoint confidence untuk ditampilkan di skeleton.
 // Harus konsisten dengan CONFIDENCE_THRESHOLD di detektor (BlazePose & MoveNet = 0.5f).
 // Keypoint dengan score di bawah ini TIDAK digambar — mencegah joint salah posisi ikut terhubung.
-private const val MIN_DRAW_CONFIDENCE = 0.4f
+private const val MIN_DRAW_CONFIDENCE = 0.15f
 
 // ─── Color Palette ───────────────────────────────────────────────
 
@@ -87,8 +89,7 @@ private object PoseColors {
 
 private fun DrawScope.drawPoseSkeleton(
         person: Person,
-        viewWidth: Float,
-        viewHeight: Float,
+        transform: PoseRenderTransform,
         formFeedback: FormFeedback?
 ) {
     val keypoints = person.keypoints
@@ -96,28 +97,77 @@ private fun DrawScope.drawPoseSkeleton(
 
     // Layer 1: Glow effects on highlighted joints (drawn first, behind everything)
     if (highlights.isNotEmpty()) {
-        drawJointGlows(keypoints, viewWidth, viewHeight, highlights)
+        drawJointGlows(keypoints, transform, highlights)
     }
 
     // Layer 2: Connections (bones)
-    drawConnections(keypoints, viewWidth, viewHeight, highlights)
+    drawConnections(keypoints, transform, highlights)
 
     // Layer 3: Angle arcs at key joints
-    drawAngleArcs(keypoints, viewWidth, viewHeight, highlights)
+    drawAngleArcs(keypoints, transform, highlights)
 
     // Layer 4: Keypoints (joints) — drawn on top
-    drawKeypoints(keypoints, viewWidth, viewHeight, highlights)
+    drawKeypoints(keypoints, transform, highlights)
 
     // Layer 5: Angle value labels at key joints
-    drawAngleLabels(keypoints, viewWidth, viewHeight)
+    drawAngleLabels(keypoints, transform)
+}
+
+private data class PoseRenderTransform(
+        val offsetX: Float,
+        val offsetY: Float,
+        val width: Float,
+        val height: Float
+) {
+    val minDimension: Float = min(width, height)
+
+    fun point(keypoint: Keypoint): Offset =
+            Offset(
+                    x = offsetX + keypoint.x * width,
+                    y = offsetY + keypoint.y * height
+            )
+}
+
+private fun calculateFitCenterTransform(
+        viewWidth: Float,
+        viewHeight: Float,
+        sourceAspectRatio: Float?
+): PoseRenderTransform {
+    if (viewWidth <= 0f || viewHeight <= 0f) {
+        return PoseRenderTransform(0f, 0f, viewWidth, viewHeight)
+    }
+
+    val aspectRatio =
+            sourceAspectRatio?.takeIf { it.isFinite() && it > 0f }
+                    ?: return PoseRenderTransform(0f, 0f, viewWidth, viewHeight)
+
+    val viewAspectRatio = viewWidth / viewHeight
+    return if (viewAspectRatio > aspectRatio) {
+        val contentHeight = viewHeight
+        val contentWidth = contentHeight * aspectRatio
+        PoseRenderTransform(
+                offsetX = (viewWidth - contentWidth) / 2f,
+                offsetY = 0f,
+                width = contentWidth,
+                height = contentHeight
+        )
+    } else {
+        val contentWidth = viewWidth
+        val contentHeight = contentWidth / aspectRatio
+        PoseRenderTransform(
+                offsetX = 0f,
+                offsetY = (viewHeight - contentHeight) / 2f,
+                width = contentWidth,
+                height = contentHeight
+        )
+    }
 }
 
 // ─── Glow Effects ────────────────────────────────────────────────
 
 private fun DrawScope.drawJointGlows(
         keypoints: List<Keypoint>,
-        viewWidth: Float,
-        viewHeight: Float,
+        transform: PoseRenderTransform,
         highlights: Map<Int, FeedbackSeverity>
 ) {
     val minConfidence = MIN_DRAW_CONFIDENCE
@@ -128,7 +178,7 @@ private fun DrawScope.drawJointGlows(
         val kp = keypoints.getOrNull(jointIdx) ?: return@forEach
         if (kp.score < minConfidence) return@forEach
 
-        val center = Offset(kp.x * viewWidth, kp.y * viewHeight)
+        val center = transform.point(kp)
         val glowColor = PoseColors.glowForSeverity(severity)
         val glowRadius = if (severity == FeedbackSeverity.ERROR) 40f else 28f
 
@@ -147,8 +197,7 @@ private fun DrawScope.drawJointGlows(
 
 private fun DrawScope.drawConnections(
         keypoints: List<Keypoint>,
-        viewWidth: Float,
-        viewHeight: Float,
+        transform: PoseRenderTransform,
         highlights: Map<Int, FeedbackSeverity>
 ) {
     val connections =
@@ -208,8 +257,8 @@ private fun DrawScope.drawConnections(
                         else -> PoseColors.BONE_DEFAULT
                     }
 
-            val startOffset = Offset(start.x * viewWidth, start.y * viewHeight)
-            val endOffset = Offset(end.x * viewWidth, end.y * viewHeight)
+            val startOffset = transform.point(start)
+            val endOffset = transform.point(end)
 
             // Shadow/outline stroke (for visibility)
             drawLine(
@@ -236,8 +285,7 @@ private fun DrawScope.drawConnections(
 
 private fun DrawScope.drawKeypoints(
         keypoints: List<Keypoint>,
-        viewWidth: Float,
-        viewHeight: Float,
+        transform: PoseRenderTransform,
         highlights: Map<Int, FeedbackSeverity>
 ) {
     val minConfidence = MIN_DRAW_CONFIDENCE
@@ -246,7 +294,7 @@ private fun DrawScope.drawKeypoints(
 
     keypoints.forEachIndexed { index, keypoint ->
         if (keypoint.score >= minConfidence) {
-            val center = Offset(x = keypoint.x * viewWidth, y = keypoint.y * viewHeight)
+            val center = transform.point(keypoint)
 
             val severity = highlights[index]
             val isHighlighted = severity != null
@@ -272,8 +320,7 @@ private fun DrawScope.drawKeypoints(
 
 private fun DrawScope.drawAngleArcs(
         keypoints: List<Keypoint>,
-        viewWidth: Float,
-        viewHeight: Float,
+        transform: PoseRenderTransform,
         highlights: Map<Int, FeedbackSeverity>
 ) {
     val minConfidence = MIN_DRAW_CONFIDENCE
@@ -281,8 +328,7 @@ private fun DrawScope.drawAngleArcs(
     // Knee angles (for squat)
     drawAngleArc(
             keypoints,
-            viewWidth,
-            viewHeight,
+            transform,
             BodyPart.LEFT_HIP,
             BodyPart.LEFT_KNEE,
             BodyPart.LEFT_ANKLE,
@@ -291,8 +337,7 @@ private fun DrawScope.drawAngleArcs(
     )
     drawAngleArc(
             keypoints,
-            viewWidth,
-            viewHeight,
+            transform,
             BodyPart.RIGHT_HIP,
             BodyPart.RIGHT_KNEE,
             BodyPart.RIGHT_ANKLE,
@@ -303,8 +348,7 @@ private fun DrawScope.drawAngleArcs(
     // Elbow angles (for push-up)
     drawAngleArc(
             keypoints,
-            viewWidth,
-            viewHeight,
+            transform,
             BodyPart.LEFT_SHOULDER,
             BodyPart.LEFT_ELBOW,
             BodyPart.LEFT_WRIST,
@@ -313,8 +357,7 @@ private fun DrawScope.drawAngleArcs(
     )
     drawAngleArc(
             keypoints,
-            viewWidth,
-            viewHeight,
+            transform,
             BodyPart.RIGHT_SHOULDER,
             BodyPart.RIGHT_ELBOW,
             BodyPart.RIGHT_WRIST,
@@ -325,8 +368,7 @@ private fun DrawScope.drawAngleArcs(
 
 private fun DrawScope.drawAngleArc(
         keypoints: List<Keypoint>,
-        viewWidth: Float,
-        viewHeight: Float,
+        transform: PoseRenderTransform,
         firstIdx: Int,
         middleIdx: Int,
         lastIdx: Int,
@@ -341,16 +383,16 @@ private fun DrawScope.drawAngleArc(
     if (first.score < minConfidence || middle.score < minConfidence || last.score < minConfidence)
             return
 
-    val middlePos = Offset(middle.x * viewWidth, middle.y * viewHeight)
-    val firstPos = Offset(first.x * viewWidth, first.y * viewHeight)
-    val lastPos = Offset(last.x * viewWidth, last.y * viewHeight)
+    val middlePos = transform.point(middle)
+    val firstPos = transform.point(first)
+    val lastPos = transform.point(last)
 
     // Calculate angles for arc drawing
     val angle1 = atan2((firstPos.y - middlePos.y).toDouble(), (firstPos.x - middlePos.x).toDouble())
     val angle2 = atan2((lastPos.y - middlePos.y).toDouble(), (lastPos.x - middlePos.x).toDouble())
 
     // Arc radius proportional to view size (but small)
-    val arcRadius = min(viewWidth, viewHeight) * 0.04f
+    val arcRadius = transform.minDimension * 0.04f
 
     val arcColor =
             if (severity != null) {
@@ -403,8 +445,7 @@ private fun DrawScope.drawAngleArc(
 
 private fun DrawScope.drawAngleLabels(
         keypoints: List<Keypoint>,
-        viewWidth: Float,
-        viewHeight: Float
+        transform: PoseRenderTransform
 ) {
     val minConfidence = MIN_DRAW_CONFIDENCE
     val paint =
@@ -419,8 +460,7 @@ private fun DrawScope.drawAngleLabels(
     // Draw knee angle labels
     drawAngleLabel(
             keypoints,
-            viewWidth,
-            viewHeight,
+            transform,
             BodyPart.LEFT_HIP,
             BodyPart.LEFT_KNEE,
             BodyPart.LEFT_ANKLE,
@@ -429,8 +469,7 @@ private fun DrawScope.drawAngleLabels(
     )
     drawAngleLabel(
             keypoints,
-            viewWidth,
-            viewHeight,
+            transform,
             BodyPart.RIGHT_HIP,
             BodyPart.RIGHT_KNEE,
             BodyPart.RIGHT_ANKLE,
@@ -441,8 +480,7 @@ private fun DrawScope.drawAngleLabels(
     // Draw elbow angle labels
     drawAngleLabel(
             keypoints,
-            viewWidth,
-            viewHeight,
+            transform,
             BodyPart.LEFT_SHOULDER,
             BodyPart.LEFT_ELBOW,
             BodyPart.LEFT_WRIST,
@@ -451,8 +489,7 @@ private fun DrawScope.drawAngleLabels(
     )
     drawAngleLabel(
             keypoints,
-            viewWidth,
-            viewHeight,
+            transform,
             BodyPart.RIGHT_SHOULDER,
             BodyPart.RIGHT_ELBOW,
             BodyPart.RIGHT_WRIST,
@@ -463,8 +500,7 @@ private fun DrawScope.drawAngleLabels(
 
 private fun DrawScope.drawAngleLabel(
         keypoints: List<Keypoint>,
-        viewWidth: Float,
-        viewHeight: Float,
+        transform: PoseRenderTransform,
         firstIdx: Int,
         middleIdx: Int,
         lastIdx: Int,
@@ -486,7 +522,7 @@ private fun DrawScope.drawAngleLabel(
                     last
             )
 
-    val middlePos = Offset(middle.x * viewWidth, middle.y * viewHeight)
+    val middlePos = transform.point(middle)
 
     // Offset label slightly from joint
     val labelX = middlePos.x + 20f
@@ -507,7 +543,7 @@ private val DEBUG_SHORT_NAMES = listOf(
     "L.kn", "R.kn", "L.ank", "R.ank"
 )
 
-private fun DrawScope.drawDebugLabels(person: Person, viewWidth: Float, viewHeight: Float) {
+private fun DrawScope.drawDebugLabels(person: Person, transform: PoseRenderTransform) {
     val paint = android.graphics.Paint().apply {
         textSize = 22f
         isAntiAlias = true
@@ -517,8 +553,9 @@ private fun DrawScope.drawDebugLabels(person: Person, viewWidth: Float, viewHeig
 
     person.keypoints.forEachIndexed { index, kp ->
         // Tampilkan semua keypoint — termasuk yang score rendah — supaya bisa debug
-        val px = kp.x * viewWidth
-        val py = kp.y * viewHeight
+        val point = transform.point(kp)
+        val px = point.x
+        val py = point.y
         val name = DEBUG_SHORT_NAMES.getOrElse(index) { "#$index" }
         val scoreStr = "%.2f".format(kp.score)
 

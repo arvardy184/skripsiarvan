@@ -92,7 +92,9 @@ object AngleCalculator {
         val wrist = person.keypoints.getOrNull(BodyPart.LEFT_WRIST)
 
         if (shoulder == null || elbow == null || wrist == null) return null
-        if (shoulder.score < 0.2f || elbow.score < 0.2f || wrist.score < 0.2f) return null
+        // Wrist pakai threshold 0.1 (lebih rendah dari 0.2) karena saat push-up wrist berada
+        // di lantai dan sering dianggap partially occluded oleh model, padahal nyata terlihat.
+        if (shoulder.score < 0.2f || elbow.score < 0.2f || wrist.score < 0.1f) return null
 
         val angle = calculateAngle(shoulder, elbow, wrist)
         // Sudut siku valid: 20°–180°
@@ -109,7 +111,7 @@ object AngleCalculator {
         val wrist = person.keypoints.getOrNull(BodyPart.RIGHT_WRIST)
 
         if (shoulder == null || elbow == null || wrist == null) return null
-        if (shoulder.score < 0.2f || elbow.score < 0.2f || wrist.score < 0.2f) return null
+        if (shoulder.score < 0.2f || elbow.score < 0.2f || wrist.score < 0.1f) return null
 
         val angle = calculateAngle(shoulder, elbow, wrist)
         return if (angle >= 20.0) angle else null

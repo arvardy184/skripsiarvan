@@ -10,11 +10,17 @@ import com.application.skripsiarvan.domain.model.Person
 interface PoseDetector {
 
     /**
-     * Detect pose from bitmap image
-     * @param bitmap Input image
+     * Detect pose from bitmap image.
+     * @param bitmap Model-sized input, unless handlesPreprocessingInternally() returns true.
      * @return Detected person with keypoints, or null if no person detected
      */
     fun detectPose(bitmap: Bitmap): Person?
+
+    /**
+     * True when the detector expects the original rotated camera frame and handles model-size
+     * letterboxing/cropping internally.
+     */
+    fun handlesPreprocessingInternally(): Boolean = false
 
     /**
      * Get the required input image size for this model
