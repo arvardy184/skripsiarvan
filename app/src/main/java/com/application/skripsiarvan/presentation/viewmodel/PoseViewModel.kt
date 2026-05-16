@@ -34,11 +34,12 @@ import kotlinx.coroutines.launch
 data class PoseUiState(
         // Model & Delegate selection
         val selectedModel: ModelType = ModelType.MOVENET_LIGHTNING,
-        val selectedDelegate: DelegateType = DelegateType.CPU_BASELINE,
-        val effectiveDelegate: DelegateType = DelegateType.CPU_BASELINE,
+        val selectedDelegate: DelegateType = DelegateType.CPU_XNNPACK,
+        val effectiveDelegate: DelegateType = DelegateType.CPU_XNNPACK,
 
         // Pose detection results
         val detectedPerson: Person? = null,
+        val cameraFrameAspectRatio: Float = 0f,
 
         // Performance metrics (Variabel Terikat)
         val inferenceTime: Long = 0L, // Latensi inferensi (ms)
@@ -73,7 +74,12 @@ data class PoseUiState(
 
         // Export state
         val lastExportPath: String? = null,
-        val benchmarkSummary: BenchmarkSummary? = null
+        val benchmarkSummary: BenchmarkSummary? = null,
+
+        // Metadata eksperimen untuk CSV final
+        val replicationId: Int = 1,
+        val groundTruthReps: Int = 0,
+        val experimentVersion: String = ""
 )
 
 /** Device information for display */
@@ -114,6 +120,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                 // Clean up previous resources
                 currentDetector?.close()
                 tfliteHelper?.close()
+                tfliteHelper = null
 
                 val currentState = _uiState.value
 
@@ -121,7 +128,6 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value =
                         currentState.copy(isWarmUpComplete = false, warmUpFramesRemaining = 5)
 
-                // Create TFLite helper with selected delegate
                 tfliteHelper =
                         TFLiteHelper(
                                 context = getApplication(),
@@ -141,7 +147,6 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // Create appropriate detector based on model type
                 currentDetector =
                         when (currentState.selectedModel) {
                             ModelType.MOVENET_LIGHTNING -> MoveNetDetector(interpreter)
@@ -235,7 +240,13 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
             cpuUsage: Float,
             memoryUsage: Float,
             powerConsumption: Float,
-            isWarmUpFrame: Boolean
+            cameraFrameAspectRatio: Float,
+            isWarmUpFrame: Boolean,
+            convertMs: Double = 0.0,
+            preprocessMs: Double = 0.0,
+            postprocessMs: Double = 0.0,
+            avgKeypointConfidence: Float = 0f,
+            validKeypointCount: Int = 0
     ) {
         val currentState = _uiState.value
 
@@ -263,6 +274,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value =
                 currentState.copy(
                         detectedPerson = person,
+                        cameraFrameAspectRatio = cameraFrameAspectRatio,
                         inferenceTime = modelInferenceTime,
                         fps = fps,
                         cpuUsage = cpuUsage,
@@ -294,7 +306,16 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                             powerConsumptionMw = powerConsumption,
                             exerciseType = currentState.selectedExercise.name,
                             repetitionCount = repCount,
-                            poseDetected = person != null
+                            poseDetected = person != null,
+                            replicationId = currentState.replicationId,
+                            groundTruthReps = currentState.groundTruthReps,
+                            experimentVersion = currentState.experimentVersion,
+                            isWarmup = isWarmUpFrame,
+                            convertMs = convertMs,
+                            preprocessMs = preprocessMs,
+                            postprocessMs = postprocessMs,
+                            avgKeypointConfidence = avgKeypointConfidence,
+                            validKeypointCount = validKeypointCount
                     )
             benchmarkLogger.logMetrics(metrics)
         }
@@ -343,7 +364,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                 )
     }
 
-    /** Export logged data to CSV */
+    /** Export logged data to CSV (frame-level) */
     fun exportToCsv() {
         viewModelScope.launch(Dispatchers.IO) {
             val path = benchmarkLogger.exportToCsv()
@@ -353,6 +374,31 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                             errorMessage = if (path == null) "Export failed" else null
                     )
         }
+    }
+
+    /** Export session summary CSV (satu baris, siap ANOVA) */
+    fun exportSessionSummaryCsv() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val path = benchmarkLogger.exportSessionSummaryCsv()
+            _uiState.value =
+                    _uiState.value.copy(
+                            lastExportPath = path,
+                            errorMessage = if (path == null) "Summary export failed" else null
+                    )
+        }
+    }
+
+    /** Update metadata eksperimen untuk CSV final */
+    fun setExperimentMetadata(
+        replicationId: Int,
+        groundTruthReps: Int,
+        experimentVersion: String
+    ) {
+        _uiState.value = _uiState.value.copy(
+            replicationId = replicationId,
+            groundTruthReps = groundTruthReps,
+            experimentVersion = experimentVersion
+        )
     }
 
     /** Reset exercise counter */

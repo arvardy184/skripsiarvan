@@ -1,17 +1,22 @@
 package com.application.skripsiarvan.data.detector
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Matrix
 import android.util.Log
 import com.application.skripsiarvan.domain.detector.PoseDetector
 import com.application.skripsiarvan.domain.model.BodyPart
 import com.application.skripsiarvan.domain.model.Keypoint
 import com.application.skripsiarvan.domain.model.Person
+import kotlin.math.ceil
 import kotlin.math.exp
+import kotlin.math.max
+import kotlin.math.min
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
-import org.tensorflow.lite.support.image.ops.ResizeOp
 
 /**
  * MediaPipe BlazePose Lite detector implementation.
@@ -30,6 +35,8 @@ import org.tensorflow.lite.support.image.ops.ResizeOp
  * 5. frameCount terpisah dari rangeDetectionAttempts — logging tidak spam setiap frame
  * 6. Buffer output di-cache di level kelas — tidak dialokasi ulang tiap frame (menghindari GC pressure)
  * 7. Warm-up 5 frame awal (sesuai Bab 4.5.1 Strategi Pengukuran Latensi)
+ * 8. ROI tracking manual dari keypoints frame sebelumnya, sesuai arsitektur asli MediaPipe
+ *    dua tahap untuk model BlazePose landmark-only.
  *
  * Mapping: 33 BlazePose keypoints → 17 COCO keypoints untuk konsistensi dengan MoveNet.
  */
@@ -39,15 +46,23 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         private const val TAG = "BlazePoseDetector"
         private const val INPUT_SIZE = 256
         private const val NUM_KEYPOINTS = 17
-        private const val BLAZEPOSE_KEYPOINTS = 33
-        // Threshold sama dengan MoveNet (0.3f) agar perbandingan fair.
-        // Anti-ghost tetap terjaga via global presence gate (tensor ke-1) yang merupakan
-        // metadata native model BlazePose — bukan filter artifisial.
-        private const val CONFIDENCE_THRESHOLD = 0.3f
+        private const val MIN_BLAZEPOSE_KEYPOINTS = 33
+        private const val MAX_BLAZEPOSE_KEYPOINTS = 50
+        private const val LANDMARK_VALUES_PER_KEYPOINT = 5
+        private const val BLAZEPOSE_KEYPOINTS = MIN_BLAZEPOSE_KEYPOINTS
+        // Dinaikkan 0.15 → 0.25 untuk menekan ghost detection saat tidak ada orang.
+        // Noise output model saat frame kosong menghasilkan avgScore ~0.10–0.18;
+        // threshold 0.25 memastikan hanya deteksi nyata yang lolos.
+        private const val CONFIDENCE_THRESHOLD = 0.25f
 
-        // Minimal skor presence per-keypoint agar dianggap benar-benar ada di frame.
-        // sigmoid(0) = 0.5, jadi threshold ini menyaring output noise saat tidak ada orang.
-        private const val PRESENCE_THRESHOLD = 0.5f
+        // Threshold global presence tensor (output ke-1 BlazePose).
+        // Diturunkan 0.5 → 0.35 agar push-up DOWN phase (presence sering ~0.4) tetap lolos.
+        private const val PRESENCE_THRESHOLD = 0.35f
+        // Diaktifkan kembali — gate ini adalah filter anti-ghost paling akurat karena
+        // langsung dari model, bukan heuristik koordinat.
+        private const val ENABLE_GLOBAL_PRESENCE_GATE = true
+        private const val MIN_VALID_KEYPOINTS = 5
+        private const val MIN_VALID_KEYPOINT_SCORE = 0.2f
 
         // Warm-up ditangani sepenuhnya oleh PoseImageAnalyzer (WARM_UP_FRAMES = 5) untuk
         // KEDUA model secara simetris. BlazePose tidak punya internal warm-up sendiri agar
@@ -73,8 +88,18 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         // tidak ada kondisi "person detected tapi keypoint dibekukan".
         private const val EMA_LOW_CONF_THRESHOLD = 0.15f
 
-        // Batas kegagalan berturut-turut sebelum EMA history di-clear.
-        private const val MAX_CONSECUTIVE_FAILURES = 10
+        // Diturunkan 10 → 4: EMA history di-clear lebih cepat saat orang meninggalkan frame,
+        // mencegah keypoints "melayang" selama beberapa detik setelah objek hilang.
+        private const val MAX_CONSECUTIVE_FAILURES = 4
+        private const val VERBOSE_KEYPOINT_LOG = false
+
+        // Manual ROI tracking untuk landmark-only BlazePose. Model ini dilatih pada crop ketat,
+        // sehingga frame penuh hanya dipakai sebagai bootstrap/fallback.
+        private const val ROI_KEYPOINT_SCORE_THRESHOLD = 0.15f
+        private const val ROI_MIN_VALID_KEYPOINTS = 4
+        private const val ROI_PADDING_RATIO = 0.20f
+        private const val ROI_MIN_SIDE = 0.55f
+        private const val ROI_EMA_ALPHA = 0.6f
 
         // Pemetaan indeks COCO 17 → indeks BlazePose 33
         // Referensi urutan BlazePose: 0=nose, 1=left_eye_inner, 2=left_eye, 3=left_eye_outer,
@@ -103,7 +128,6 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     // Preprocessing: resize ke 256×256, normalisasi ke [-1, 1] untuk model FP16 BlazePose
     private val imageProcessor =
         ImageProcessor.Builder()
-            .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
             .add(NormalizeOp(127.5f, 127.5f))
             .build()
 
@@ -116,6 +140,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     private var cachedOutputArray: FloatArray? = null
     private var cachedTotalSize: Int = 0
     private var cachedValuesPerKeypoint: Int = 0
+    private var landmarkOutputIndex: Int = 0
 
     // ── Deteksi rentang koordinat (pixel vs normalized) ─────────────────────────────────────────
     private var coordsDivisor: Float = 1.0f
@@ -135,14 +160,69 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
     // Diinisialisasi null; jika model tidak memiliki tensor ke-1, tetap null dan diabaikan.
     private var globalPresenceBuffer: java.nio.ByteBuffer? = null
     private var hasGlobalPresenceTensor = false
+    private var globalPresenceOutputIndex: Int = -1
     private var globalPresenceChecked = false
     private var firstDetectionLogged = false
+    private var trackedRoi: Roi? = null
+
+    private data class Roi(
+        val left: Float,
+        val top: Float,
+        val right: Float,
+        val bottom: Float
+    ) {
+        val width: Float get() = right - left
+        val height: Float get() = bottom - top
+
+        fun clamped(): Roi {
+            val l = left.coerceIn(0f, 1f)
+            val t = top.coerceIn(0f, 1f)
+            val r = right.coerceIn(0f, 1f)
+            val b = bottom.coerceIn(0f, 1f)
+            return if (r > l && b > t) Roi(l, t, r, b) else FULL
+        }
+
+        fun isFullFrame(): Boolean =
+            left <= 0f && top <= 0f && right >= 1f && bottom >= 1f
+
+        fun shortString(): String =
+            "(%.2f,%.2f)-(%.2f,%.2f)".format(left, top, right, bottom)
+
+        companion object {
+            val FULL = Roi(0f, 0f, 1f, 1f)
+        }
+    }
+
+    private data class CropInput(
+        val bitmap: Bitmap,
+        val roiInOriginal: Roi,
+        val ownsBitmap: Boolean
+    )
+
+    private data class LetterboxResult(
+        val bitmap: Bitmap,
+        val scale: Float,
+        val padX: Float,
+        val padY: Float,
+        val targetW: Float,
+        val targetH: Float,
+        val srcW: Float,
+        val srcH: Float
+    )
+
+    private data class InferenceResult(
+        val keypoints: List<Keypoint>,
+        val rawKeypointValues: FloatArray,
+        val avgScore: Float,
+        val roiCandidate: Roi?,
+        val usedRoi: Roi
+    )
 
     /**
      * Inisialisasi buffer output sekali berdasarkan shape tensor output model.
      * Dipanggil pada frame pertama karena interpreter harus sudah fully initialized.
      */
-    private fun ensureBuffersInitialized() {
+    private fun ensureBuffersInitializedLegacy() {
         if (cachedOutputBuffer != null) return
 
         val numOutputs = interpreter.outputTensorCount
@@ -190,6 +270,74 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         }
     }
 
+    private fun ensureBuffersInitialized() {
+        if (cachedOutputBuffer != null) return
+
+        val numOutputs = interpreter.outputTensorCount
+        val inputShape = interpreter.getInputTensor(0).shape()
+        val inputType = interpreter.getInputTensor(0).dataType()
+        var landmarkShape: IntArray? = null
+        var totalSize = 0
+
+        Log.d(TAG, "BlazePose Init")
+        Log.d(TAG, "  in : ${inputShape.contentToString()} $inputType")
+
+        for (i in 0 until numOutputs) {
+            val tensor = interpreter.getOutputTensor(i)
+            val shape = tensor.shape()
+            val size = shape.reduce { acc, value -> acc * value }
+            Log.d(TAG, "  out[$i]: ${shape.contentToString()} ${tensor.dataType()} totalSize=$size")
+
+            val keypointCount = size / LANDMARK_VALUES_PER_KEYPOINT
+            val looksLikeLandmarks =
+                    size % LANDMARK_VALUES_PER_KEYPOINT == 0 &&
+                            keypointCount in MIN_BLAZEPOSE_KEYPOINTS..MAX_BLAZEPOSE_KEYPOINTS
+
+            if (looksLikeLandmarks && landmarkShape == null) {
+                landmarkOutputIndex = i
+                landmarkShape = shape
+                totalSize = size
+            }
+
+            if (size == 1 && globalPresenceOutputIndex == -1) {
+                globalPresenceOutputIndex = i
+            }
+        }
+
+        if (landmarkShape == null) {
+            Log.e(TAG, "Output landmark BlazePose tidak ditemukan. Cek file model .tflite yang dipakai.")
+            return
+        }
+
+        cachedTotalSize = totalSize
+        cachedValuesPerKeypoint = LANDMARK_VALUES_PER_KEYPOINT
+        cachedOutputArray = FloatArray(totalSize)
+        cachedOutputBuffer = java.nio.ByteBuffer.allocateDirect(totalSize * 4).also {
+            it.order(java.nio.ByteOrder.nativeOrder())
+        }
+
+        globalPresenceChecked = true
+        if (globalPresenceOutputIndex >= 0 && globalPresenceOutputIndex != landmarkOutputIndex) {
+            val presenceShape = interpreter.getOutputTensor(globalPresenceOutputIndex).shape()
+            val presenceSize = presenceShape.reduce { acc, value -> acc * value }
+            globalPresenceBuffer = java.nio.ByteBuffer.allocateDirect(presenceSize * 4).also {
+                it.order(java.nio.ByteOrder.nativeOrder())
+            }
+            hasGlobalPresenceTensor = true
+            Log.d(TAG, "  presence out[$globalPresenceOutputIndex]: ${presenceShape.contentToString()} global presence tensor")
+        } else {
+            Log.d(TAG, "  presence tensor tidak ada, pakai filter per-keypoint saja")
+        }
+
+        Log.d(
+                TAG,
+                "  landmarks out[$landmarkOutputIndex]: ${landmarkShape.contentToString()} " +
+                        "totalSize=$totalSize, stride=$LANDMARK_VALUES_PER_KEYPOINT"
+        )
+    }
+
+    override fun handlesPreprocessingInternally(): Boolean = true
+
     override fun detectPose(bitmap: Bitmap): Person? {
         synchronized(lock) {
             if (isClosed) return null
@@ -200,105 +348,45 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                 // Inisialisasi buffer sekali (lazy init — aman karena di dalam synchronized)
                 ensureBuffersInitialized()
 
-                val outputBuf = cachedOutputBuffer ?: return null
-                val outputArr = cachedOutputArray ?: return null
-                val totalSize = cachedTotalSize
-                val valuesPerKeypoint = cachedValuesPerKeypoint
+                val roiAtFrameStart = trackedRoi
+                var inference = runInference(bitmap, roiAtFrameStart)
 
-                // Preprocessing citra
-                var tensorImage = TensorImage.fromBitmap(bitmap)
-                tensorImage = imageProcessor.process(tensorImage)
-
-                // Jalankan inferensi (latensi diukur di PoseImageAnalyzer, bukan di sini)
-                outputBuf.rewind()
-                if (hasGlobalPresenceTensor) {
-                    // Jalankan dengan multi-output agar tensor ke-1 juga terisi
-                    val outputs = mapOf(0 to outputBuf, 1 to globalPresenceBuffer!!)
-                    interpreter.runForMultipleInputsOutputs(arrayOf(tensorImage.buffer), outputs)
-                } else {
-                    interpreter.run(tensorImage.buffer, outputBuf)
-                }
-
-                // Baca nilai output
-                outputBuf.rewind()
-                outputBuf.asFloatBuffer().get(outputArr)
-
-                // ── Gate 1: Global pose presence (jika tensor ke-1 tersedia) ─────────────────
-                // Ini filter paling awal — jika model sendiri bilang "tidak ada orang",
-                // langsung return null tanpa parsing keypoints sama sekali.
-                if (hasGlobalPresenceTensor) {
-                    val presenceBuf = globalPresenceBuffer!!
-                    presenceBuf.rewind()
-                    val globalPresenceLogit = presenceBuf.asFloatBuffer().get()
-                    val globalPresence = sigmoid(globalPresenceLogit)
-                    if (globalPresence < PRESENCE_THRESHOLD) {
-                        if (frameCount % 30 == 0) {
-                            Log.v(TAG, "Global presence terlalu rendah: ${"%.3f".format(globalPresence)} — tidak ada orang")
-                        }
-                        handleDetectionFailure()
-                        return null
+                if (roiAtFrameStart != null && (inference == null || !isAcceptedDetection(inference))) {
+                    trackedRoi = null
+                    inference = runInference(bitmap, null)
+                    if (frameCount % 30 == 0) {
+                        Log.v(TAG, "ROI lost/invalid, fallback ke full-frame inference")
                     }
                 }
 
-                // Auto-deteksi rentang koordinat pada frame awal
-                if (!rangeDetected) {
-                    if (rangeDetectionAttempts < 10) {
-                        detectCoordinateRange(outputArr, valuesPerKeypoint)
-                        rangeDetectionAttempts++
-                    } else {
-                        // Tidak dapat menentukan rentang dalam 10 frame — pakai default (1.0f)
-                        Log.w(TAG,
-                            "⚠️ Tidak dapat mendeteksi rentang koordinat dalam 10 frame. " +
-                            "Default divisor=$coordsDivisor. Koordinat mungkin tidak akurat " +
-                            "jika model output piksel [0, $INPUT_SIZE].")
-                        rangeDetected = true
-                    }
+                if (inference == null) {
+                    handleDetectionFailure()
+                    return null
                 }
 
-                // Parse keypoints
-                val keypoints = mutableListOf<Keypoint>()
-                var totalScore = 0f
-                val currentRawKeypoints = FloatArray(NUM_KEYPOINTS * 2)
+                val keypoints = inference.keypoints
+                val avgScore = inference.avgScore
+                val enoughValidKeypoints = hasEnoughValidKeypoints(keypoints)
+                val detected = avgScore >= CONFIDENCE_THRESHOLD && enoughValidKeypoints
 
-                for (cocoIdx in 0 until NUM_KEYPOINTS) {
-                    val blazePoseIdx = COCO_TO_BLAZEPOSE[cocoIdx] ?: 0
-                    val offset = blazePoseIdx * valuesPerKeypoint
-
-                    if (offset + valuesPerKeypoint - 1 >= totalSize) {
-                        // Indeks di luar batas — tambah dummy keypoint agar list tetap 17 elemen
-                        keypoints.add(Keypoint(x = 0f, y = 0f, score = 0f,
-                            label = BodyPart.labels[cocoIdx]))
-                        continue
-                    }
-
-                    // Ambil koordinat mentah dan normalisasi ke [0, 1]
-                    val x = (outputArr[offset]     / coordsDivisor).coerceIn(0f, 1f)
-                    val y = (outputArr[offset + 1] / coordsDivisor).coerceIn(0f, 1f)
-
-                    // Visibility & Presence: keduanya logit dari BlazePose, perlu sigmoid.
-                    // - visibility (index 3): apakah keypoint terlihat (tidak terhalang)
-                    // - presence  (index 4): apakah keypoint benar-benar ada di frame
-                    // Pakai min keduanya → skor efektif lebih ketat, menekan false positive.
-                    val rawVisibility = if (valuesPerKeypoint >= 4) outputArr[offset + 3] else 0.5f
-                    val rawPresence   = if (valuesPerKeypoint >= 5) outputArr[offset + 4] else rawVisibility
-                    val visibility    = sigmoid(rawVisibility)
-                    val presence      = sigmoid(rawPresence)
-                    val effectiveScore = minOf(visibility, presence)
-
-                    currentRawKeypoints[cocoIdx * 2]     = x
-                    currentRawKeypoints[cocoIdx * 2 + 1] = y
-
-                    keypoints.add(Keypoint(x = x, y = y, score = effectiveScore,
-                        label = BodyPart.labels[cocoIdx]))
-                    totalScore += effectiveScore
+                if (frameCount % 30 == 0) {
+                    val lShoulder = keypoints[5]
+                    val lHip = keypoints[11]
+                    val lKnee = keypoints[13]
+                    Log.d(
+                            TAG,
+                            "BlazePose test frame=$frameCount avg=${"%.3f".format(avgScore)} " +
+                                    "div=$coordsDivisor stride=$cachedValuesPerKeypoint roi=${inference.usedRoi.shortString()} | " +
+                                    "L.sh=(${"%.2f".format(lShoulder.x)},${"%.2f".format(lShoulder.y)}) s=${"%.2f".format(lShoulder.score)} " +
+                                    "L.hip=(${"%.2f".format(lHip.x)},${"%.2f".format(lHip.y)}) s=${"%.2f".format(lHip.score)} " +
+                                    "L.kn=(${"%.2f".format(lKnee.x)},${"%.2f".format(lKnee.y)}) s=${"%.2f".format(lKnee.score)}"
+                    )
                 }
-
-                val avgScore = totalScore / NUM_KEYPOINTS
 
                 // Log raw keypoint hip/knee/ankle tiap 10 frame — untuk verifikasi
                 // model menghasilkan koordinat yang bergerak saat squat (sebelum EMA).
                 rawLogCounter++
-                if (rawLogCounter % 10 == 0) {
+                if (VERBOSE_KEYPOINT_LOG && rawLogCounter % 10 == 0) {
                     val lh = keypoints[11]; val rh = keypoints[12]
                     val lk = keypoints[13]; val rk = keypoints[14]
                     val la = keypoints[15]; val ra = keypoints[16]
@@ -313,9 +401,13 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                 }
 
                 // Terapkan EMA temporal smoothing
-                val smoothedKeypoints = applyTemporalSmoothing(keypoints, currentRawKeypoints)
+                val smoothedKeypoints = applyTemporalSmoothing(keypoints, inference.rawKeypointValues)
 
-                return if (avgScore >= CONFIDENCE_THRESHOLD) {
+                if (detected && inference.roiCandidate != null) {
+                    updateTrackedRoi(inference.roiCandidate)
+                }
+
+                return if (detected) {
                     consecutiveFailureCount = 0
                     if (!firstDetectionLogged) {
                         firstDetectionLogged = true
@@ -323,7 +415,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                         val lShoulder = smoothedKeypoints[5]
                         val rShoulder = smoothedKeypoints[6]
                         val lHip      = smoothedKeypoints[11]
-                        Log.d(TAG, "✓ First detection: avg=${"%.3f".format(avgScore)} | divisor=$coordsDivisor | stride=$valuesPerKeypoint")
+                        Log.d(TAG, "✓ First detection: avg=${"%.3f".format(avgScore)} | divisor=$coordsDivisor | stride=$cachedValuesPerKeypoint | roi=${trackedRoi?.shortString() ?: "full"}")
                         Log.d(TAG, "  nose      (${"%5.3f".format(nose.x)}, ${"%5.3f".format(nose.y)}) s=${"%4.2f".format(nose.score)}")
                         Log.d(TAG, "  L.shoulder(${"%5.3f".format(lShoulder.x)}, ${"%5.3f".format(lShoulder.y)}) s=${"%4.2f".format(lShoulder.score)}")
                         Log.d(TAG, "  R.shoulder(${"%5.3f".format(rShoulder.x)}, ${"%5.3f".format(rShoulder.y)}) s=${"%4.2f".format(rShoulder.score)}")
@@ -340,7 +432,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                     Log.d(TAG, "Detector sudah ditutup saat inferensi berlangsung — diabaikan")
                 } else {
                     try {
-                        val shape = interpreter.getOutputTensor(0).shape().contentToString()
+                        val shape = interpreter.getOutputTensor(landmarkOutputIndex).shape().contentToString()
                         Log.e(TAG, "Error BlazePose. Shape output: $shape. Pesan: ${e.message}")
                     } catch (ex: Exception) {
                         Log.e(TAG, "Error saat deteksi BlazePose: ${e.message}", e)
@@ -349,6 +441,260 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
                 return null
             }
         }
+    }
+
+    private fun isAcceptedDetection(inference: InferenceResult): Boolean =
+        inference.avgScore >= CONFIDENCE_THRESHOLD && hasEnoughValidKeypoints(inference.keypoints)
+
+    private fun runInference(sourceBitmap: Bitmap, requestedRoi: Roi?): InferenceResult? {
+        val outputBuf = cachedOutputBuffer ?: return null
+        val outputArr = cachedOutputArray ?: return null
+        val totalSize = cachedTotalSize
+        val valuesPerKeypoint = cachedValuesPerKeypoint
+        if (valuesPerKeypoint < 3) return null
+
+        val cropInput = createCropInput(sourceBitmap, requestedRoi ?: Roi.FULL)
+        val letterbox = createLetterboxedBitmap(cropInput.bitmap, INPUT_SIZE, INPUT_SIZE)
+
+        try {
+            var tensorImage = TensorImage.fromBitmap(letterbox.bitmap)
+            tensorImage = imageProcessor.process(tensorImage)
+
+            outputBuf.rewind()
+            val outputs = HashMap<Int, Any>()
+            outputs[landmarkOutputIndex] = outputBuf
+
+            if (ENABLE_GLOBAL_PRESENCE_GATE && hasGlobalPresenceTensor) {
+                val presenceBuffer = globalPresenceBuffer ?: return null
+                presenceBuffer.rewind()
+                outputs[globalPresenceOutputIndex] = presenceBuffer
+            }
+
+            interpreter.runForMultipleInputsOutputs(arrayOf(tensorImage.buffer), outputs)
+
+            outputBuf.rewind()
+            outputBuf.asFloatBuffer().get(outputArr)
+
+            if (ENABLE_GLOBAL_PRESENCE_GATE && hasGlobalPresenceTensor) {
+                val presenceBuf = globalPresenceBuffer!!
+                presenceBuf.rewind()
+                val rawGlobalPresence = presenceBuf.asFloatBuffer().get()
+                val globalPresence = toProbability(rawGlobalPresence)
+                if (globalPresence < PRESENCE_THRESHOLD) {
+                    if (frameCount % 30 == 0) {
+                        Log.v(TAG, "Global presence terlalu rendah: ${"%.3f".format(globalPresence)} — tidak ada orang")
+                    }
+                    return null
+                }
+            }
+
+            if (!rangeDetected) {
+                if (rangeDetectionAttempts < 10) {
+                    detectCoordinateRange(outputArr, valuesPerKeypoint)
+                    rangeDetectionAttempts++
+                } else {
+                    Log.w(TAG,
+                        "⚠️ Tidak dapat mendeteksi rentang koordinat dalam 10 frame. " +
+                        "Default divisor=$coordsDivisor. Koordinat mungkin tidak akurat " +
+                        "jika model output piksel [0, $INPUT_SIZE].")
+                    rangeDetected = true
+                }
+            }
+
+            val keypoints = mutableListOf<Keypoint>()
+            var totalScore = 0f
+            val currentRawKeypoints = FloatArray(NUM_KEYPOINTS * 2)
+
+            for (cocoIdx in 0 until NUM_KEYPOINTS) {
+                val blazePoseIdx = COCO_TO_BLAZEPOSE[cocoIdx] ?: 0
+                val offset = blazePoseIdx * valuesPerKeypoint
+
+                if (offset + valuesPerKeypoint - 1 >= totalSize) {
+                    keypoints.add(Keypoint(x = 0f, y = 0f, score = 0f,
+                        label = BodyPart.labels[cocoIdx]))
+                    continue
+                }
+
+                val modelX = (outputArr[offset] / coordsDivisor).coerceIn(0f, 1f)
+                val modelY = (outputArr[offset + 1] / coordsDivisor).coerceIn(0f, 1f)
+                val cropPoint = unprojectLetterboxPoint(modelX, modelY, letterbox)
+                val x = (cropInput.roiInOriginal.left + cropPoint.first * cropInput.roiInOriginal.width)
+                    .coerceIn(0f, 1f)
+                val y = (cropInput.roiInOriginal.top + cropPoint.second * cropInput.roiInOriginal.height)
+                    .coerceIn(0f, 1f)
+
+                val rawVisibility = if (valuesPerKeypoint >= 4) outputArr[offset + 3] else 0.5f
+                val rawPresence = if (valuesPerKeypoint >= 5) outputArr[offset + 4] else rawVisibility
+                val visibility = toProbability(rawVisibility)
+                val presence = toProbability(rawPresence)
+                val effectiveScore = minOf(visibility, presence)
+
+                currentRawKeypoints[cocoIdx * 2] = x
+                currentRawKeypoints[cocoIdx * 2 + 1] = y
+
+                keypoints.add(Keypoint(x = x, y = y, score = effectiveScore,
+                    label = BodyPart.labels[cocoIdx]))
+                totalScore += effectiveScore
+            }
+
+            return InferenceResult(
+                keypoints = keypoints,
+                rawKeypointValues = currentRawKeypoints,
+                avgScore = totalScore / NUM_KEYPOINTS,
+                roiCandidate = computeRoiFromKeypoints(keypoints),
+                usedRoi = cropInput.roiInOriginal
+            )
+        } finally {
+            letterbox.bitmap.recycle()
+            if (cropInput.ownsBitmap) {
+                cropInput.bitmap.recycle()
+            }
+        }
+    }
+
+    private fun createCropInput(source: Bitmap, requestedRoi: Roi): CropInput {
+        val roi = requestedRoi.clamped()
+        if (roi.isFullFrame()) {
+            return CropInput(source, Roi.FULL, ownsBitmap = false)
+        }
+
+        val sourceW = source.width
+        val sourceH = source.height
+        val left = (roi.left * sourceW).toInt().coerceIn(0, sourceW - 1)
+        val top = (roi.top * sourceH).toInt().coerceIn(0, sourceH - 1)
+        val right = ceil(roi.right * sourceW).toInt().coerceIn(left + 1, sourceW)
+        val bottom = ceil(roi.bottom * sourceH).toInt().coerceIn(top + 1, sourceH)
+        val crop = Bitmap.createBitmap(source, left, top, right - left, bottom - top)
+        val actualRoi = Roi(
+            left = left / sourceW.toFloat(),
+            top = top / sourceH.toFloat(),
+            right = right / sourceW.toFloat(),
+            bottom = bottom / sourceH.toFloat()
+        )
+
+        return CropInput(crop, actualRoi, ownsBitmap = true)
+    }
+
+    private fun createLetterboxedBitmap(
+        source: Bitmap,
+        targetW: Int,
+        targetH: Int
+    ): LetterboxResult {
+        val srcW = source.width.toFloat()
+        val srcH = source.height.toFloat()
+        val scale = min(targetW / srcW, targetH / srcH)
+        val scaledW = (srcW * scale).toInt()
+        val scaledH = (srcH * scale).toInt()
+        val padX = (targetW - scaledW) / 2f
+        val padY = (targetH - scaledH) / 2f
+
+        val letterboxed = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(letterboxed)
+        canvas.drawColor(Color.BLACK)
+
+        val matrix = Matrix()
+        matrix.setScale(scale, scale)
+        matrix.postTranslate(padX, padY)
+        canvas.drawBitmap(source, matrix, null)
+
+        return LetterboxResult(
+            bitmap = letterboxed,
+            scale = scale,
+            padX = padX,
+            padY = padY,
+            targetW = targetW.toFloat(),
+            targetH = targetH.toFloat(),
+            srcW = srcW,
+            srcH = srcH
+        )
+    }
+
+    private fun unprojectLetterboxPoint(
+        x: Float,
+        y: Float,
+        letterbox: LetterboxResult
+    ): Pair<Float, Float> {
+        val pixelX = x * letterbox.targetW
+        val pixelY = y * letterbox.targetH
+        val scaledW = letterbox.srcW * letterbox.scale
+        val scaledH = letterbox.srcH * letterbox.scale
+        val cropX = (pixelX - letterbox.padX) / scaledW
+        val cropY = (pixelY - letterbox.padY) / scaledH
+        return Pair(cropX.coerceIn(0f, 1f), cropY.coerceIn(0f, 1f))
+    }
+
+    private fun computeRoiFromKeypoints(keypoints: List<Keypoint>): Roi? {
+        var minX = 1f
+        var minY = 1f
+        var maxX = 0f
+        var maxY = 0f
+        var validCount = 0
+
+        for (keypoint in keypoints) {
+            if (keypoint.score <= ROI_KEYPOINT_SCORE_THRESHOLD) continue
+            minX = minOf(minX, keypoint.x)
+            minY = minOf(minY, keypoint.y)
+            maxX = maxOf(maxX, keypoint.x)
+            maxY = maxOf(maxY, keypoint.y)
+            validCount++
+        }
+
+        if (validCount < ROI_MIN_VALID_KEYPOINTS) return null
+
+        val bboxW = maxX - minX
+        val bboxH = maxY - minY
+        if (bboxW <= 0f || bboxH <= 0f) return null
+
+        val centerX = (minX + maxX) / 2f
+        val centerY = (minY + maxY) / 2f
+
+        // BlazePose landmark model expects a square-ish tight person crop. A raw keypoint bbox
+        // can collapse to torso/arms during push-up, so keep a minimum square side.
+        val paddedSide = max(bboxW, bboxH) * (1f + 2f * ROI_PADDING_RATIO)
+        val side = max(paddedSide, ROI_MIN_SIDE).coerceAtMost(1f)
+        return squareRoi(centerX, centerY, side)
+    }
+
+    private fun squareRoi(centerX: Float, centerY: Float, side: Float): Roi {
+        val half = side / 2f
+        var left = centerX - half
+        var top = centerY - half
+        var right = centerX + half
+        var bottom = centerY + half
+
+        if (left < 0f) {
+            right -= left
+            left = 0f
+        }
+        if (right > 1f) {
+            left -= right - 1f
+            right = 1f
+        }
+        if (top < 0f) {
+            bottom -= top
+            top = 0f
+        }
+        if (bottom > 1f) {
+            top -= bottom - 1f
+            bottom = 1f
+        }
+
+        return Roi(left, top, right, bottom).clamped()
+    }
+
+    private fun updateTrackedRoi(candidate: Roi) {
+        val previous = trackedRoi
+        trackedRoi =
+            if (previous == null) {
+                candidate.clamped()
+            } else {
+                Roi(
+                    left = ROI_EMA_ALPHA * candidate.left + (1 - ROI_EMA_ALPHA) * previous.left,
+                    top = ROI_EMA_ALPHA * candidate.top + (1 - ROI_EMA_ALPHA) * previous.top,
+                    right = ROI_EMA_ALPHA * candidate.right + (1 - ROI_EMA_ALPHA) * previous.right,
+                    bottom = ROI_EMA_ALPHA * candidate.bottom + (1 - ROI_EMA_ALPHA) * previous.bottom
+                ).clamped()
+            }
     }
 
     /**
@@ -458,6 +804,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         consecutiveFailureCount++
         if (consecutiveFailureCount > MAX_CONSECUTIVE_FAILURES) {
             previousKeypoints = null
+            trackedRoi = null
         }
     }
 
@@ -465,7 +812,35 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
      * Sigmoid: konversi logit → probabilitas [0, 1].
      * BlazePose mengeluarkan visibility/presence sebagai logit, bukan probabilitas langsung.
      */
+    private fun toProbability(value: Float): Float =
+        if (value in 0f..1f) value else sigmoid(value)
+
     private fun sigmoid(x: Float): Float = 1.0f / (1.0f + exp(-x))
+
+    private fun hasEnoughValidKeypoints(keypoints: List<Keypoint>): Boolean {
+        fun score(idx: Int) = (keypoints.getOrNull(idx)?.score ?: 0f) >= MIN_VALID_KEYPOINT_SCORE
+
+        // Kuorum atas: shoulder + elbow + hip — cukup untuk push-up / plank (badan horizontal,
+        // knee & ankle sering invisible karena dekat lantai atau di luar frame).
+        val upperValid = listOf(
+            BodyPart.LEFT_SHOULDER, BodyPart.RIGHT_SHOULDER,
+            BodyPart.LEFT_ELBOW,    BodyPart.RIGHT_ELBOW,
+            BodyPart.LEFT_HIP,      BodyPart.RIGHT_HIP
+        ).count { score(it) }
+        if (upperValid >= 4) return true
+
+        // Kuorum bawah: hip + knee + ankle — cukup untuk squat / berdiri.
+        val lowerValid = listOf(
+            BodyPart.LEFT_HIP,   BodyPart.RIGHT_HIP,
+            BodyPart.LEFT_KNEE,  BodyPart.RIGHT_KNEE,
+            BodyPart.LEFT_ANKLE, BodyPart.RIGHT_ANKLE
+        ).count { score(it) }
+        if (lowerValid >= 3) return true
+
+        if (frameCount % 30 == 0)
+            Log.v(TAG, "Pose ditolak: upper=$upperValid/4 lower=$lowerValid/3")
+        return false
+    }
 
     override fun getInputSize(): Pair<Int, Int> = Pair(INPUT_SIZE, INPUT_SIZE)
 
@@ -475,8 +850,7 @@ class BlazePoseDetector(private val interpreter: Interpreter) : PoseDetector {
         synchronized(lock) {
             isClosed = true
             previousKeypoints = null
-            // Buffer output tidak di-null karena ByteBuffer native memory akan dibebaskan
-            // oleh GC setelah referensi hilang bersama instance ini
+            trackedRoi = null
         }
     }
 }

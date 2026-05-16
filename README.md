@@ -10,7 +10,7 @@ AccelPose is designed for Computer Science thesis research to benchmark:
 - **3-Level Performance Progression**: CPU Baseline → CPU XNNPACK → GPU Delegate
 
 ### Supported Models
-1. **MoveNet Lightning (INT8)** - Fast, efficient pose detection
+1. **MoveNet Lightning (FP16)** - Fast, efficient pose detection
 2. **MediaPipe BlazePose Lite (FP16)** - High-accuracy pose estimation
 
 ## 🏗️ Architecture
@@ -120,9 +120,9 @@ cd skripsiarvan
 
 Download and place the following models in `app/src/main/assets/`:
 
-**MoveNet Lightning (INT8)**
-- Download: [TF Hub - MoveNet Lightning INT8](https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/int8/4)
-- Filename: `movenet_lightning_int8.tflite`
+**MoveNet Lightning (FP16)**
+- Download: [TF Hub - MoveNet Lightning FP16](https://tfhub.dev/google/lite-model/movenet/singlepose/lightning/tflite/float16/4)
+- Filename: `movenet.tflite`
 
 **BlazePose Lite (FP16)**
 - Download: [MediaPipe Pose Landmarker](https://developers.google.com/mediapipe/solutions/vision/pose_landmarker)

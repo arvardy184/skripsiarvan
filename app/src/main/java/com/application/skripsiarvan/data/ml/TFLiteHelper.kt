@@ -8,6 +8,7 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.GpuDelegate
+import kotlin.math.min
 
 data class TFLiteInitializationResult(
         val interpreter: Interpreter?,
@@ -26,7 +27,8 @@ class TFLiteHelper(
 
     companion object {
         private const val TAG = "TFLiteHelper"
-        private const val NUM_THREADS = 4
+        private val NUM_THREADS =
+                min(6, Runtime.getRuntime().availableProcessors()).coerceAtLeast(2)
     }
 
     /** Initialize interpreter with selected delegate and report the delegate that actually runs. */

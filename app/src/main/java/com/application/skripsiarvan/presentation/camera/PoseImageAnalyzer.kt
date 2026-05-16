@@ -35,21 +35,28 @@ class PoseImageAnalyzer(
         private val onResults:
                 (
                         person: Person?,
-                        processingTimeMs: Long,   // end-to-end: preprocessing + model inference
-                        modelInferenceTimeMs: Long, // hanya TFLite detectPose() — untuk skripsi
+                        processingTimeMs: Long,
+                        modelInferenceTimeMs: Long,
                         fps: Float,
                         cpuUsage: Float,
                         memoryUsage: Float,
                         powerConsumption: Float,
-                        isWarmUpFrame: Boolean) -> Unit
+                        cameraFrameAspectRatio: Float,
+                        isWarmUpFrame: Boolean,
+                        convertMs: Double,
+                        preprocessMs: Double,
+                        postprocessMs: Double,
+                        avgKeypointConfidence: Float,
+                        validKeypointCount: Int) -> Unit
 ) : ImageAnalysis.Analyzer {
 
     companion object {
         private const val TAG = "PoseImageAnalyzer"
         // Jumlah frame warm-up sesuai Bagian 4.5.1 skripsi
         private const val WARM_UP_FRAMES = 5
-        // Interval profiling (Bagian 4.5.2: polling setiap 100ms)
-        private const val PROFILING_INTERVAL_MS = 100
+        // Profiling resource cukup jarang agar pembacaan /proc, Debug.MemoryInfo, dan
+        // BatteryManager tidak mengganggu frame analyzer di perangkat mid-range.
+        private const val PROFILING_INTERVAL_MS = 500
     }
 
     // FPS calculation
@@ -74,40 +81,61 @@ class PoseImageAnalyzer(
             totalFrameCount++
             val isWarmUpFrame = !isWarmUpComplete
 
-            // Ambil waktu sebelum inferensi (Bagian 4.5.1)
-            val startTime = System.nanoTime()
+            // t0: mulai seluruh pipeline
+            val t0 = System.nanoTime()
 
-            // Convert ImageProxy to Bitmap
+            // Segment 1: Convert YUV → Bitmap
             val bitmap = imageProxy.toBitmapCustom()
             val rotatedBitmap = bitmap.rotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+            val cameraFrameAspectRatio = rotatedBitmap.width.toFloat() / rotatedBitmap.height
+            val t1 = System.nanoTime()
 
-            // Create letterboxed input (preserves aspect ratio!)
-            val inputSize = poseDetector.getInputSize()
-            val targetW = inputSize.first
-            val targetH = inputSize.second
-            val letterboxResult = createLetterboxedBitmap(rotatedBitmap, targetW, targetH)
-            val resizedBitmap = letterboxResult.bitmap
+            // Segment 2: Preprocess — letterbox (atau skip jika detector handle sendiri)
+            val handlesPreprocessingInternally = poseDetector.handlesPreprocessingInternally()
+            val letterboxResult =
+                    if (handlesPreprocessingInternally) {
+                        null
+                    } else {
+                        val inputSize = poseDetector.getInputSize()
+                        createLetterboxedBitmap(rotatedBitmap, inputSize.first, inputSize.second)
+                    }
+            val detectorBitmap = letterboxResult?.bitmap ?: rotatedBitmap
+            val t2 = System.nanoTime()
 
             if (poseDetector.isClosed()) {
-                resizedBitmap.recycle()
+                letterboxResult?.bitmap?.recycle()
                 rotatedBitmap.recycle()
                 bitmap.recycle()
                 imageProxy.close()
                 return
             }
 
-            // Ukur hanya TFLite inference — ini yang diklaim sebagai "latensi model" di skripsi
-            val modelStartTime = System.nanoTime()
-            val person = poseDetector.detectPose(resizedBitmap)
-            val modelInferenceTimeMs = (System.nanoTime() - modelStartTime) / 1_000_000L
+            // Segment 3: Inference — TFLite detectPose()
+            val person = poseDetector.detectPose(detectorBitmap)
+            val t3 = System.nanoTime()
 
-            // Correct keypoint coordinates from letterbox space back to original image space
-            val correctedPerson = person?.let { correctLetterboxCoordinates(it, letterboxResult) }
+            // Segment 4: Postprocess — koreksi koordinat letterbox
+            val correctedPerson =
+                    if (letterboxResult != null) {
+                        person?.let { correctLetterboxCoordinates(it, letterboxResult) }
+                    } else {
+                        person
+                    }
+            val t4 = System.nanoTime()
 
-            // End-to-end processing time (termasuk YUV decode, rotate, letterbox, model)
-            val processingTimeMs = (System.nanoTime() - startTime) / 1_000_000L
+            val convertMs = (t1 - t0) / 1_000_000.0
+            val preprocessMs = (t2 - t1) / 1_000_000.0
+            val modelInferenceTimeMs = (t3 - t2) / 1_000_000L
+            val postprocessMs = (t4 - t3) / 1_000_000.0
+            val processingTimeMs = (t4 - t0) / 1_000_000L
 
-            // FPS: gunakan rolling 1-detik; fallback instantaneous untuk detik pertama
+            // Keypoint quality
+            val keypoints = correctedPerson?.keypoints ?: emptyList()
+            val validKeypoints = keypoints.filter { it.score >= 0.2f }
+            val avgKeypointConfidence = if (keypoints.isNotEmpty()) keypoints.map { it.score }.average().toFloat() else 0f
+            val validKeypointCount = validKeypoints.size
+
+            // FPS: rolling 1-detik; fallback instantaneous untuk detik pertama
             frameCount++
             val currentTime = System.currentTimeMillis()
             val frameDeltaMs = if (lastFrameTimestamp > 0) currentTime - lastFrameTimestamp else 0L
@@ -119,7 +147,6 @@ class PoseImageAnalyzer(
                 frameCount = 0
                 lastFpsTimestamp = currentTime
             } else if (currentFps == 0f && frameDeltaMs > 0) {
-                // Belum ada rolling FPS — pakai instantaneous agar detik pertama tidak report 0
                 currentFps = 1000f / frameDeltaMs
             }
 
@@ -141,7 +168,13 @@ class PoseImageAnalyzer(
                     lastCpuUsage,
                     lastMemoryUsage,
                     lastPowerConsumption,
-                    isWarmUpFrame
+                    cameraFrameAspectRatio,
+                    isWarmUpFrame,
+                    if (isWarmUpFrame) 0.0 else convertMs,
+                    if (isWarmUpFrame) 0.0 else preprocessMs,
+                    if (isWarmUpFrame) 0.0 else postprocessMs,
+                    avgKeypointConfidence,
+                    validKeypointCount
             )
 
             // Geometric sanity check setiap 60 frame (hanya saat ada orang)
@@ -153,18 +186,20 @@ class PoseImageAnalyzer(
             if (totalFrameCount % 30 == 0) {
                 Log.d(
                         TAG,
-                        "FPS=%.1f model=%dms total=%dms WarmUp=%b Scale=%.2f".format(
+                        "FPS=%.1f model=%dms total=%dms convert=%.1fms pre=%.1fms post=%.1fms WarmUp=%b".format(
                                 currentFps,
                                 modelInferenceTimeMs,
                                 processingTimeMs,
-                                isWarmUpFrame,
-                                letterboxResult.scale
+                                convertMs,
+                                preprocessMs,
+                                postprocessMs,
+                                isWarmUpFrame
                         )
                 )
             }
 
             // Clean up
-            resizedBitmap.recycle()
+            letterboxResult?.bitmap?.recycle()
             rotatedBitmap.recycle()
             bitmap.recycle()
         } catch (e: Exception) {
@@ -202,15 +237,15 @@ class PoseImageAnalyzer(
         val padX = (targetW - scaledW) / 2f
         val padY = (targetH - scaledH) / 2f
 
-        // Create target bitmap with black background
         val letterboxed = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(letterboxed)
         canvas.drawColor(Color.BLACK)
 
-        // Draw scaled source centered in target
-        val scaledBitmap = Bitmap.createScaledBitmap(source, scaledW, scaledH, true)
-        canvas.drawBitmap(scaledBitmap, padX, padY, null)
-        scaledBitmap.recycle()
+        // Single-pass scale+translate via Matrix — avoids allocating an intermediate bitmap
+        val matrix = Matrix()
+        matrix.setScale(scale, scale)
+        matrix.postTranslate(padX, padY)
+        canvas.drawBitmap(source, matrix, null)
 
         return LetterboxResult(
                 bitmap = letterboxed,

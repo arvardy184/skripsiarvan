@@ -10,7 +10,6 @@ import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
 import org.tensorflow.lite.support.image.TensorImage
-import org.tensorflow.lite.support.image.ops.ResizeOp
 
 /**
  * MoveNet Lightning pose detector implementation Input: 192x192 RGB image Output: [1, 1, 17, 3]
@@ -53,6 +52,7 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
         // Selama ≤N frame gagal, kita pertahankan prev keypoints sebagai base EMA
         // agar angle tidak melompat saat avgScore dip sesaat (sering di fase bawah squat).
         private const val MAX_CONSECUTIVE_FAILURES = 10
+        private const val VERBOSE_KEYPOINT_LOG = false
     }
 
     private val imageProcessor by lazy {
@@ -62,13 +62,11 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
 
         Log.d(TAG, "Init: in=${inputShape.contentToString()} $inputType | out=${outputShape.contentToString()}")
 
+        // Input bitmap is already INPUT_SIZE×INPUT_SIZE from upstream letterbox — no ResizeOp needed.
         val builder = ImageProcessor.Builder()
-            .add(ResizeOp(INPUT_SIZE, INPUT_SIZE, ResizeOp.ResizeMethod.BILINEAR))
-
         if (inputType == org.tensorflow.lite.DataType.FLOAT32) {
             builder.add(NormalizeOp(0f, 255f))
         }
-
         builder.build()
     }
 
@@ -134,7 +132,7 @@ class MoveNetDetector(private val interpreter: Interpreter) : PoseDetector {
                 // Per-10-frame raw keypoint log: verifikasi model menerima gambar bagus
                 // dan memproduksi nilai mentah yang masuk akal (sebelum EMA).
                 rawLogCounter++
-                if (rawLogCounter % 10 == 0) {
+                if (VERBOSE_KEYPOINT_LOG && rawLogCounter % 10 == 0) {
                     val lh = keypoints[11]; val rh = keypoints[12]
                     val lk = keypoints[13]; val rk = keypoints[14]
                     val la = keypoints[15]; val ra = keypoints[16]
