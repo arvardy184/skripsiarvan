@@ -245,7 +245,6 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                         onStopLogging = viewModel::stopLogging,
                         onExportCsv = viewModel::exportToCsv,
                         onResetExercise = viewModel::resetExercise,
-                        onSetExperimentMetadata = viewModel::setExperimentMetadata,
                         onExportSummary = viewModel::exportSessionSummaryCsv,
                         modifier = Modifier.align(Alignment.BottomCenter)
                 )
@@ -303,7 +302,6 @@ fun ControlPanel(
         onStopLogging: () -> Unit,
         onExportCsv: () -> Unit,
         onResetExercise: () -> Unit,
-        onSetExperimentMetadata: (Int, Int, String) -> Unit,
         onExportSummary: () -> Unit,
         modifier: Modifier = Modifier
 ) {
@@ -449,13 +447,9 @@ fun ControlPanel(
                                                 isLogging = uiState.isLogging,
                                                 loggedFrameCount = uiState.loggedFrameCount,
                                                 loggingDuration = uiState.loggingDurationSeconds,
-                                                replicationId = uiState.replicationId,
-                                                groundTruthReps = uiState.groundTruthReps,
-                                                experimentVersion = uiState.experimentVersion,
                                                 onStartLogging = onStartLogging,
                                                 onStopLogging = onStopLogging,
                                                 onExportCsv = onExportCsv,
-                                                onSetExperimentMetadata = onSetExperimentMetadata,
                                                 onExportSummary = onExportSummary
                                         )
 
@@ -722,25 +716,17 @@ fun ExerciseDisplay(
         }
 }
 
-/** Logging controls with experiment metadata input */
+/** Logging controls */
 @Composable
 fun LoggingControls(
         isLogging: Boolean,
         loggedFrameCount: Int,
         loggingDuration: Long,
-        replicationId: Int,
-        groundTruthReps: Int,
-        experimentVersion: String,
         onStartLogging: () -> Unit,
         onStopLogging: () -> Unit,
         onExportCsv: () -> Unit,
-        onSetExperimentMetadata: (Int, Int, String) -> Unit,
         onExportSummary: () -> Unit
 ) {
-        var replicationIdText by remember(replicationId) { mutableStateOf(replicationId.toString()) }
-        var groundTruthRepsText by remember(groundTruthReps) { mutableStateOf(groundTruthReps.toString()) }
-        var expVersionText by remember(experimentVersion) { mutableStateOf(experimentVersion) }
-
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                         text = "Benchmark Logging",
@@ -748,84 +734,6 @@ fun LoggingControls(
                         color = Color.Gray
                 )
 
-                // ── Metadata eksperimen ──────────────────────────────────────
-                Text(
-                        text = "Metadata Eksperimen",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFFAAAAAA)
-                )
-                Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                        OutlinedTextField(
-                                value = replicationIdText,
-                                onValueChange = { v ->
-                                        replicationIdText = v
-                                        val n = v.toIntOrNull() ?: return@OutlinedTextField
-                                        onSetExperimentMetadata(n, groundTruthReps, expVersionText)
-                                },
-                                label = { Text("Rep ID", style = MaterialTheme.typography.labelSmall) },
-                                singleLine = true,
-                                enabled = !isLogging,
-                                modifier = Modifier.weight(1f),
-                                textStyle = MaterialTheme.typography.bodySmall,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.LightGray,
-                                        disabledTextColor = Color.Gray,
-                                        focusedBorderColor = Color(0xFF4CAF50),
-                                        unfocusedBorderColor = Color.Gray,
-                                        focusedLabelColor = Color(0xFF4CAF50),
-                                        unfocusedLabelColor = Color.Gray
-                                )
-                        )
-                        OutlinedTextField(
-                                value = groundTruthRepsText,
-                                onValueChange = { v ->
-                                        groundTruthRepsText = v
-                                        val n = v.toIntOrNull() ?: return@OutlinedTextField
-                                        onSetExperimentMetadata(replicationId, n, expVersionText)
-                                },
-                                label = { Text("GT Reps", style = MaterialTheme.typography.labelSmall) },
-                                singleLine = true,
-                                enabled = !isLogging,
-                                modifier = Modifier.weight(1f),
-                                textStyle = MaterialTheme.typography.bodySmall,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.LightGray,
-                                        disabledTextColor = Color.Gray,
-                                        focusedBorderColor = Color(0xFF4CAF50),
-                                        unfocusedBorderColor = Color.Gray,
-                                        focusedLabelColor = Color(0xFF4CAF50),
-                                        unfocusedLabelColor = Color.Gray
-                                )
-                        )
-                        OutlinedTextField(
-                                value = expVersionText,
-                                onValueChange = { v ->
-                                        expVersionText = v
-                                        onSetExperimentMetadata(replicationId, groundTruthReps, v)
-                                },
-                                label = { Text("Version", style = MaterialTheme.typography.labelSmall) },
-                                singleLine = true,
-                                enabled = !isLogging,
-                                modifier = Modifier.weight(1.4f),
-                                textStyle = MaterialTheme.typography.bodySmall,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = Color.White,
-                                        unfocusedTextColor = Color.LightGray,
-                                        disabledTextColor = Color.Gray,
-                                        focusedBorderColor = Color(0xFF4CAF50),
-                                        unfocusedBorderColor = Color.Gray,
-                                        focusedLabelColor = Color(0xFF4CAF50),
-                                        unfocusedLabelColor = Color.Gray
-                                )
-                        )
-                }
-
-                // ── Record / Stop ────────────────────────────────────────────
                 Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -864,7 +772,6 @@ fun LoggingControls(
                         }
                 }
 
-                // ── Export Summary (session-level, siap ANOVA) ───────────────
                 Button(
                         onClick = onExportSummary,
                         enabled = loggedFrameCount > 0 && !isLogging,
@@ -878,7 +785,7 @@ fun LoggingControls(
 
                 if (loggedFrameCount > 0 || isLogging) {
                         Text(
-                                text = "Frames: $loggedFrameCount | Duration: ${loggingDuration}s | RepID: $replicationId | GT: $groundTruthReps",
+                                text = "Frames: $loggedFrameCount | Duration: ${loggingDuration}s",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (isLogging) Color(0xFF4CAF50) else Color.LightGray
                         )

@@ -160,13 +160,11 @@ class BenchmarkLogger(private val context: Context) {
 
     /**
      * Export session summary CSV — satu baris per sesi, siap untuk ANOVA.
-     * Hanya menghitung frame non-warmup (is_warmup = false).
      */
     fun exportSessionSummaryCsv(): String? {
-        val allMetrics = metricsQueue.toList()
-        val metrics = allMetrics.filter { !it.isWarmup }
+        val metrics = metricsQueue.toList()
         if (metrics.isEmpty()) {
-            Log.w(TAG, "No non-warmup data for session summary")
+            Log.w(TAG, "No data for session summary")
             return null
         }
 
@@ -178,21 +176,15 @@ class BenchmarkLogger(private val context: Context) {
         val medianLatency = sortedLatencies[sortedLatencies.size / 2]
 
         val pipelines = metrics.map { it.processingTimeMs.toDouble() }
-
-        val groundTruth = metrics.firstOrNull()?.groundTruthReps ?: 0
         val finalRepCount = metrics.maxOfOrNull { it.repetitionCount } ?: 0
-        val repError = finalRepCount - groundTruth
-        val repAccuracy = if (groundTruth > 0)
-            minOf(finalRepCount, groundTruth).toDouble() / groundTruth * 100.0
-        else 0.0
 
         val detectedCount = metrics.count { it.poseDetected }
         val validFrameRatio = detectedCount.toFloat() / metrics.size
 
         val first = metrics.first()
-        val summaryLine = "${first.deviceName},${first.replicationId}," +
+        val summaryLine = "${first.deviceName}," +
             "${first.modelType},${first.effectiveDelegateType},${first.exerciseType}," +
-            "$groundTruth,$finalRepCount,$repError,${"%.1f".format(repAccuracy)}," +
+            "$finalRepCount," +
             "${"%.3f".format(avgLatency)},${"%.3f".format(medianLatency)},${"%.3f".format(p95Latency)}," +
             "${"%.3f".format(pipelines.average())}," +
             "${"%.2f".format(metrics.map { it.fps.toDouble() }.average())}," +
@@ -200,14 +192,14 @@ class BenchmarkLogger(private val context: Context) {
             "${"%.2f".format(metrics.map { it.memoryUsageMb.toDouble() }.average())}," +
             "${"%.4f".format(validFrameRatio)},${metrics.size}," +
             "${getLoggingDurationSeconds() * 1000}," +
-            "${first.experimentVersion},${first.sessionLabel}"
+            "${first.sessionLabel}"
 
-        val summaryHeader = "device_name,replication_id,model_type,delegate_type,exercise_type," +
-            "ground_truth_reps,final_rep_count,rep_error,rep_accuracy_pct," +
+        val summaryHeader = "device_name,model_type,delegate_type,exercise_type," +
+            "final_rep_count," +
             "mean_inference_ms,median_inference_ms,p95_inference_ms," +
             "mean_pipeline_ms,mean_fps,mean_cpu,mean_memory_mb," +
             "valid_frame_ratio,frame_count,duration_ms," +
-            "experiment_version,session_label"
+            "session_label"
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val fileName = "${FILE_PREFIX}summary_$timestamp$FILE_EXTENSION"

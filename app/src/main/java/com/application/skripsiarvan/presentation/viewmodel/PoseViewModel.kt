@@ -74,12 +74,7 @@ data class PoseUiState(
 
         // Export state
         val lastExportPath: String? = null,
-        val benchmarkSummary: BenchmarkSummary? = null,
-
-        // Metadata eksperimen untuk CSV final
-        val replicationId: Int = 1,
-        val groundTruthReps: Int = 0,
-        val experimentVersion: String = ""
+        val benchmarkSummary: BenchmarkSummary? = null
 )
 
 /** Device information for display */
@@ -307,10 +302,6 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                             exerciseType = currentState.selectedExercise.name,
                             repetitionCount = repCount,
                             poseDetected = person != null,
-                            replicationId = currentState.replicationId,
-                            groundTruthReps = currentState.groundTruthReps,
-                            experimentVersion = currentState.experimentVersion,
-                            isWarmup = isWarmUpFrame,
                             convertMs = convertMs,
                             preprocessMs = preprocessMs,
                             postprocessMs = postprocessMs,
@@ -386,19 +377,6 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                             errorMessage = if (path == null) "Summary export failed" else null
                     )
         }
-    }
-
-    /** Update metadata eksperimen untuk CSV final */
-    fun setExperimentMetadata(
-        replicationId: Int,
-        groundTruthReps: Int,
-        experimentVersion: String
-    ) {
-        _uiState.value = _uiState.value.copy(
-            replicationId = replicationId,
-            groundTruthReps = groundTruthReps,
-            experimentVersion = experimentVersion
-        )
     }
 
     /** Reset exercise counter */
