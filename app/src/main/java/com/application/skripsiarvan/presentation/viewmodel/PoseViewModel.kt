@@ -243,72 +243,72 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
             avgKeypointConfidence: Float = 0f,
             validKeypointCount: Int = 0
     ) {
-        val currentState = _uiState.value
+        // Lempar ke Default dispatcher agar camera thread (PoseAnalyzer) langsung bebas
+        // untuk mengambil frame berikutnya tanpa menunggu StateFlow emit + Compose recompose.
+        viewModelScope.launch(Dispatchers.Default) {
+            val currentState = _uiState.value
 
-        // Update warm-up state
-        val newWarmUpRemaining =
-                if (isWarmUpFrame) {
-                    (currentState.warmUpFramesRemaining - 1).coerceAtLeast(0)
-                } else {
-                    0
-                }
-        val warmUpComplete = newWarmUpRemaining == 0
+            val newWarmUpRemaining =
+                    if (isWarmUpFrame) {
+                        (currentState.warmUpFramesRemaining - 1).coerceAtLeast(0)
+                    } else {
+                        0
+                    }
+            val warmUpComplete = newWarmUpRemaining == 0
 
-        // Exercise detection
-        var exerciseState = ExerciseState.IDLE
-        var repCount = currentState.repetitionCount
-        var currentAngle = currentState.currentAngle
+            var exerciseState = ExerciseState.IDLE
+            var repCount = currentState.repetitionCount
+            var currentAngle = currentState.currentAngle
 
-        exerciseDetector?.let { detector ->
-            exerciseState = detector.analyzeFrame(person)
-            repCount = detector.getRepetitionCount()
-            currentAngle = detector.getCurrentAngle() ?: 0.0
-        }
+            exerciseDetector?.let { detector ->
+                exerciseState = detector.analyzeFrame(person)
+                repCount = detector.getRepetitionCount()
+                currentAngle = detector.getCurrentAngle() ?: 0.0
+            }
 
-        // Update UI state
-        _uiState.value =
-                currentState.copy(
-                        detectedPerson = person,
-                        cameraFrameAspectRatio = cameraFrameAspectRatio,
-                        inferenceTime = modelInferenceTime,
-                        fps = fps,
-                        cpuUsage = cpuUsage,
-                        memoryUsage = memoryUsage,
-                        powerConsumption = powerConsumption,
-                        isWarmUpComplete = warmUpComplete,
-                        warmUpFramesRemaining = newWarmUpRemaining,
-                        exerciseState = exerciseState,
-                        repetitionCount = repCount,
-                        currentAngle = currentAngle,
-                        formFeedback = null,
-                        averageFormScore = null,
-                        loggedFrameCount = benchmarkLogger.getLoggedFrameCount(),
-                        loggingDurationSeconds = benchmarkLogger.getLoggingDurationSeconds()
-                )
-
-        // Log metrics if logging is active and warm-up is complete
-        if (benchmarkLogger.isCurrentlyLogging() && !isWarmUpFrame) {
-            val metrics =
-                    BenchmarkMetrics(
-                            modelType = currentState.selectedModel.displayName,
-                            selectedDelegateType = currentState.selectedDelegate.displayName,
-                            effectiveDelegateType = currentState.effectiveDelegate.displayName,
-                            inferenceTimeMs = modelInferenceTime,
-                            processingTimeMs = processingTime,
+            _uiState.value =
+                    currentState.copy(
+                            detectedPerson = person,
+                            cameraFrameAspectRatio = cameraFrameAspectRatio,
+                            inferenceTime = modelInferenceTime,
                             fps = fps,
-                            cpuUsagePercent = cpuUsage,
-                            memoryUsageMb = memoryUsage,
-                            powerConsumptionMw = powerConsumption,
-                            exerciseType = currentState.selectedExercise.name,
+                            cpuUsage = cpuUsage,
+                            memoryUsage = memoryUsage,
+                            powerConsumption = powerConsumption,
+                            isWarmUpComplete = warmUpComplete,
+                            warmUpFramesRemaining = newWarmUpRemaining,
+                            exerciseState = exerciseState,
                             repetitionCount = repCount,
-                            poseDetected = person != null,
-                            convertMs = convertMs,
-                            preprocessMs = preprocessMs,
-                            postprocessMs = postprocessMs,
-                            avgKeypointConfidence = avgKeypointConfidence,
-                            validKeypointCount = validKeypointCount
+                            currentAngle = currentAngle,
+                            formFeedback = null,
+                            averageFormScore = null,
+                            loggedFrameCount = benchmarkLogger.getLoggedFrameCount(),
+                            loggingDurationSeconds = benchmarkLogger.getLoggingDurationSeconds()
                     )
-            benchmarkLogger.logMetrics(metrics)
+
+            if (benchmarkLogger.isCurrentlyLogging() && !isWarmUpFrame) {
+                val metrics =
+                        BenchmarkMetrics(
+                                modelType = currentState.selectedModel.displayName,
+                                selectedDelegateType = currentState.selectedDelegate.displayName,
+                                effectiveDelegateType = currentState.effectiveDelegate.displayName,
+                                inferenceTimeMs = modelInferenceTime,
+                                processingTimeMs = processingTime,
+                                fps = fps,
+                                cpuUsagePercent = cpuUsage,
+                                memoryUsageMb = memoryUsage,
+                                powerConsumptionMw = powerConsumption,
+                                exerciseType = currentState.selectedExercise.name,
+                                repetitionCount = repCount,
+                                poseDetected = person != null,
+                                convertMs = convertMs,
+                                preprocessMs = preprocessMs,
+                                postprocessMs = postprocessMs,
+                                avgKeypointConfidence = avgKeypointConfidence,
+                                validKeypointCount = validKeypointCount
+                        )
+                benchmarkLogger.logMetrics(metrics)
+            }
         }
     }
 
