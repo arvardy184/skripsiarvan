@@ -74,7 +74,11 @@ data class PoseUiState(
 
         // Export state
         val lastExportPath: String? = null,
-        val benchmarkSummary: BenchmarkSummary? = null
+        val benchmarkSummary: BenchmarkSummary? = null,
+
+        // ANOVA experiment metadata
+        val replicationId: Int = 1,
+        val groundTruthReps: Int = 30
 )
 
 /** Device information for display */
@@ -312,10 +316,20 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Set replication ID (1–99) sebelum mulai sesi */
+    fun setReplicationId(id: Int) {
+        _uiState.value = _uiState.value.copy(replicationId = id.coerceIn(1, 99))
+    }
+
+    /** Set ground truth reps untuk kalkulasi akurasi repetisi */
+    fun setGroundTruthReps(reps: Int) {
+        _uiState.value = _uiState.value.copy(groundTruthReps = reps.coerceIn(1, 999))
+    }
+
     /**
      * Start benchmark logging.
-     * sessionLabel opsional untuk identifikasi kombinasi (misal: "MoveNet_XNNPACK_Squat").
-     * Kalau kosong, akan di-auto-generate dari state saat ini.
+     * sessionLabel opsional; kalau kosong di-auto-generate termasuk rep ID.
+     * Format: "MoveNet_XNNPACK_SQUAT_rep1"
      */
     fun startLogging(sessionLabel: String = "") {
         val state = _uiState.value
@@ -335,10 +349,11 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                 DelegateType.GPU -> "GPU"
             }
             val exerciseShort = state.selectedExercise.name
+            val repSuffix = "rep${state.replicationId}"
             if (state.selectedDelegate == state.effectiveDelegate) {
-                "${modelShort}_${delegateShort}_${exerciseShort}"
+                "${modelShort}_${delegateShort}_${exerciseShort}_${repSuffix}"
             } else {
-                "${modelShort}_${delegateShort}_AS_${effectiveDelegateShort}_${exerciseShort}"
+                "${modelShort}_${delegateShort}_AS_${effectiveDelegateShort}_${exerciseShort}_${repSuffix}"
             }
         }
         benchmarkLogger.startLogging(label)
@@ -370,7 +385,11 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
     /** Export session summary CSV (satu baris, siap ANOVA) */
     fun exportSessionSummaryCsv() {
         viewModelScope.launch(Dispatchers.IO) {
-            val path = benchmarkLogger.exportSessionSummaryCsv()
+            val state = _uiState.value
+            val path = benchmarkLogger.exportSessionSummaryCsv(
+                replicationId = state.replicationId,
+                groundTruthReps = state.groundTruthReps
+            )
             _uiState.value =
                     _uiState.value.copy(
                             lastExportPath = path,

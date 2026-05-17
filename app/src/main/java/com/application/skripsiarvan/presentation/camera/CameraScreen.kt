@@ -21,7 +21,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -246,6 +248,8 @@ fun CameraScreen(viewModel: PoseViewModel = viewModel()) {
                         onExportCsv = viewModel::exportToCsv,
                         onResetExercise = viewModel::resetExercise,
                         onExportSummary = viewModel::exportSessionSummaryCsv,
+                        onSetReplicationId = viewModel::setReplicationId,
+                        onSetGroundTruthReps = viewModel::setGroundTruthReps,
                         modifier = Modifier.align(Alignment.BottomCenter)
                 )
 
@@ -303,6 +307,8 @@ fun ControlPanel(
         onExportCsv: () -> Unit,
         onResetExercise: () -> Unit,
         onExportSummary: () -> Unit,
+        onSetReplicationId: (Int) -> Unit,
+        onSetGroundTruthReps: (Int) -> Unit,
         modifier: Modifier = Modifier
 ) {
         Card(
@@ -447,6 +453,10 @@ fun ControlPanel(
                                                 isLogging = uiState.isLogging,
                                                 loggedFrameCount = uiState.loggedFrameCount,
                                                 loggingDuration = uiState.loggingDurationSeconds,
+                                                replicationId = uiState.replicationId,
+                                                groundTruthReps = uiState.groundTruthReps,
+                                                onReplicationIdChanged = onSetReplicationId,
+                                                onGroundTruthRepsChanged = onSetGroundTruthReps,
                                                 onStartLogging = onStartLogging,
                                                 onStopLogging = onStopLogging,
                                                 onExportCsv = onExportCsv,
@@ -722,6 +732,10 @@ fun LoggingControls(
         isLogging: Boolean,
         loggedFrameCount: Int,
         loggingDuration: Long,
+        replicationId: Int,
+        groundTruthReps: Int,
+        onReplicationIdChanged: (Int) -> Unit,
+        onGroundTruthRepsChanged: (Int) -> Unit,
         onStartLogging: () -> Unit,
         onStopLogging: () -> Unit,
         onExportCsv: () -> Unit,
@@ -733,6 +747,27 @@ fun LoggingControls(
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.Gray
                 )
+
+                // Rep ID + GT Reps fields (disabled while logging)
+                Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                        CompactNumberField(
+                                label = "Rep ID",
+                                value = replicationId,
+                                onValueChange = onReplicationIdChanged,
+                                enabled = !isLogging,
+                                modifier = Modifier.weight(1f)
+                        )
+                        CompactNumberField(
+                                label = "GT Reps",
+                                value = groundTruthReps,
+                                onValueChange = onGroundTruthRepsChanged,
+                                enabled = !isLogging,
+                                modifier = Modifier.weight(1f)
+                        )
+                }
 
                 Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -790,6 +825,45 @@ fun LoggingControls(
                                 color = if (isLogging) Color(0xFF4CAF50) else Color.LightGray
                         )
                 }
+        }
+}
+
+/** Input angka ringkas untuk Rep ID dan GT Reps */
+@Composable
+fun CompactNumberField(
+        label: String,
+        value: Int,
+        onValueChange: (Int) -> Unit,
+        enabled: Boolean,
+        modifier: Modifier = Modifier
+) {
+        var text by remember(value) { mutableStateOf(value.toString()) }
+        Column(modifier = modifier) {
+                Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (enabled) Color.LightGray else Color.Gray
+                )
+                OutlinedTextField(
+                        value = text,
+                        onValueChange = { input ->
+                                text = input.filter { it.isDigit() }.take(3)
+                                text.toIntOrNull()?.let { onValueChange(it) }
+                        },
+                        enabled = enabled,
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall.copy(color = Color.White),
+                        colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFF7B1FA2),
+                                unfocusedBorderColor = Color.DarkGray,
+                                disabledBorderColor = Color.DarkGray.copy(alpha = 0.5f),
+                                disabledTextColor = Color.Gray
+                        ),
+                        modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
         }
 }
 

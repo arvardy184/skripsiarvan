@@ -160,8 +160,9 @@ class BenchmarkLogger(private val context: Context) {
 
     /**
      * Export session summary CSV — satu baris per sesi, siap untuk ANOVA.
+     * replicationId dan groundTruthReps dikirim dari ViewModel saat export.
      */
-    fun exportSessionSummaryCsv(): String? {
+    fun exportSessionSummaryCsv(replicationId: Int = 1, groundTruthReps: Int = 30): String? {
         val metrics = metricsQueue.toList()
         if (metrics.isEmpty()) {
             Log.w(TAG, "No data for session summary")
@@ -181,10 +182,16 @@ class BenchmarkLogger(private val context: Context) {
         val detectedCount = metrics.count { it.poseDetected }
         val validFrameRatio = detectedCount.toFloat() / metrics.size
 
+        val repError = finalRepCount - groundTruthReps
+        val repAccuracy = if (groundTruthReps > 0) {
+            1.0 - (kotlin.math.abs(repError).toDouble() / groundTruthReps)
+        } else 0.0
+
         val first = metrics.first()
         val summaryLine = "${first.deviceName}," +
+            "$replicationId," +
             "${first.modelType},${first.effectiveDelegateType},${first.exerciseType}," +
-            "$finalRepCount," +
+            "$groundTruthReps,$finalRepCount,$repError,${"%.4f".format(repAccuracy)}," +
             "${"%.3f".format(avgLatency)},${"%.3f".format(medianLatency)},${"%.3f".format(p95Latency)}," +
             "${"%.3f".format(pipelines.average())}," +
             "${"%.2f".format(metrics.map { it.fps.toDouble() }.average())}," +
@@ -194,8 +201,9 @@ class BenchmarkLogger(private val context: Context) {
             "${getLoggingDurationSeconds() * 1000}," +
             "${first.sessionLabel}"
 
-        val summaryHeader = "device_name,model_type,delegate_type,exercise_type," +
-            "final_rep_count," +
+        val summaryHeader = "device_name,replication_id," +
+            "model_type,delegate_type,exercise_type," +
+            "ground_truth_reps,final_rep_count,rep_error,rep_accuracy," +
             "mean_inference_ms,median_inference_ms,p95_inference_ms," +
             "mean_pipeline_ms,mean_fps,mean_cpu,mean_memory_mb," +
             "valid_frame_ratio,frame_count,duration_ms," +
