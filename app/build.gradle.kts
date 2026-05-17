@@ -72,6 +72,12 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // Jangan kompresi file .tflite — file model harus bisa di-mmap langsung dari assets.
+    // Kalau terkompresi, TFLite FileUtil.loadMappedFile() akan crash di release build.
+    androidResources {
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
