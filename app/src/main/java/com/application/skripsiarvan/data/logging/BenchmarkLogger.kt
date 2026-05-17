@@ -187,17 +187,18 @@ class BenchmarkLogger(private val context: Context) {
             1.0 - (kotlin.math.abs(repError).toDouble() / groundTruthReps)
         } else 0.0
 
+        val f = java.util.Locale.US
         val first = metrics.first()
         val summaryLine = "${first.deviceName}," +
             "$replicationId," +
             "${first.modelType},${first.effectiveDelegateType},${first.exerciseType}," +
-            "$groundTruthReps,$finalRepCount,$repError,${"%.4f".format(repAccuracy)}," +
-            "${"%.3f".format(avgLatency)},${"%.3f".format(medianLatency)},${"%.3f".format(p95Latency)}," +
-            "${"%.3f".format(pipelines.average())}," +
-            "${"%.2f".format(metrics.map { it.fps.toDouble() }.average())}," +
-            "${"%.2f".format(metrics.map { it.cpuUsagePercent.toDouble() }.average())}," +
-            "${"%.2f".format(metrics.map { it.memoryUsageMb.toDouble() }.average())}," +
-            "${"%.4f".format(validFrameRatio)},${metrics.size}," +
+            "$groundTruthReps,$finalRepCount,$repError,${String.format(f, "%.4f", repAccuracy)}," +
+            "${String.format(f, "%.3f", avgLatency)},${String.format(f, "%.3f", medianLatency)},${String.format(f, "%.3f", p95Latency)}," +
+            "${String.format(f, "%.3f", pipelines.average())}," +
+            "${String.format(f, "%.2f", metrics.map { it.fps.toDouble() }.average())}," +
+            "${String.format(f, "%.2f", metrics.map { it.cpuUsagePercent.toDouble() }.average())}," +
+            "${String.format(f, "%.2f", metrics.map { it.memoryUsageMb.toDouble() }.average())}," +
+            "${String.format(f, "%.4f", validFrameRatio)},${metrics.size}," +
             "${getLoggingDurationSeconds() * 1000}," +
             "${first.sessionLabel}"
 

@@ -1,6 +1,7 @@
 package com.application.skripsiarvan.domain.model
 
 import android.os.Build
+import java.util.Locale
 
 /**
  * Data class untuk menyimpan semua metrik benchmark per-frame.
@@ -30,13 +31,14 @@ data class BenchmarkMetrics(
     val validKeypointCount: Int = 0
 ) {
     fun toCsvLine(): String {
+        val f = Locale.US
         return "$timestamp,$modelType,$selectedDelegateType,$effectiveDelegateType," +
-               "$inferenceTimeMs,$processingTimeMs,$fps," +
-               "$cpuUsagePercent,$memoryUsageMb,$powerConsumptionMw," +
+               "$inferenceTimeMs,$processingTimeMs,${String.format(f, "%.3f", fps)}," +
+               "${String.format(f, "%.3f", cpuUsagePercent)},${String.format(f, "%.3f", memoryUsageMb)},${String.format(f, "%.3f", powerConsumptionMw)}," +
                "$exerciseType,$repetitionCount,$frameNumber,${if (poseDetected) 1 else 0},$sessionLabel," +
                "$deviceName," +
-               "${"%.3f".format(convertMs)},${"%.3f".format(preprocessMs)},${"%.3f".format(postprocessMs)}," +
-               "${"%.4f".format(avgKeypointConfidence)},$validKeypointCount"
+               "${String.format(f, "%.3f", convertMs)},${String.format(f, "%.3f", preprocessMs)},${String.format(f, "%.3f", postprocessMs)}," +
+               "${String.format(f, "%.4f", avgKeypointConfidence)},$validKeypointCount"
     }
 
     companion object {
