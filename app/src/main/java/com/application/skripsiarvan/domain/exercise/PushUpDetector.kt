@@ -267,10 +267,8 @@ class PushUpDetector : ExerciseDetector {
         val shoulder = listOfNotNull(leftShoulder, rightShoulder).maxByOrNull { it.score }
         val hip = listOfNotNull(leftHip, rightHip).maxByOrNull { it.score }
         if (shoulder == null || hip == null) return false
-        if (
-                shoulder.score < MIN_PUSHUP_KEYPOINT_SCORE ||
-                        hip.score < MIN_PUSHUP_KEYPOINT_SCORE
-        ) return false
+        if (shoulder.score < MIN_PUSHUP_KEYPOINT_SCORE ||
+                hip.score < MIN_PUSHUP_KEYPOINT_SCORE) return false
 
         val torsoDx = kotlin.math.abs(shoulder.x - hip.x)
         val torsoDy = kotlin.math.abs(shoulder.y - hip.y)
@@ -278,12 +276,25 @@ class PushUpDetector : ExerciseDetector {
         // Kondisi 1 (side-view): shoulder dan hip terpisah secara horizontal — badan mendatar.
         val isSideHorizontal = torsoDx > torsoDy && torsoDx >= MIN_BODY_HORIZONTAL_EXTENT
 
-        // Kondisi 2 (BlazePose front-view): model collapse shoulder/hip ke x serupa,
-        // tapi ketinggian y keduanya hampir sama → badan tetap horizontal.
-        // Berdiri/squat: torsoDy ≥ 0.25 (bahu jauh lebih tinggi dari pinggul).
-        val isFlatByY = torsoDy < 0.20f
+        // Kondisi 2 (front-view): bahu dan pinggul hampir satu ketinggian y → badan horizontal.
+        // Diperketat 0.20 → 0.12 karena squat dari kamera depan juga bisa torsoDy kecil
+        // saat posisi bawah. Threshold lebih ketat memaksa hanya posisi benar-benar flat.
+        val isFlatByY = torsoDy < 0.12f
 
-        return isSideHorizontal || isFlatByY
+        if (!isSideHorizontal && !isFlatByY) return false
+
+        // Guard tambahan: tolak pose squat yang lolos filter di atas.
+        // Squat ditandai lutut tertekuk — knee.y > hip.y secara signifikan (lutut lebih rendah).
+        // Pada push-up, lutut hampir selevel atau lebih tinggi dari pinggul.
+        val leftKnee = person.keypoints.getOrNull(BodyPart.LEFT_KNEE)
+        val rightKnee = person.keypoints.getOrNull(BodyPart.RIGHT_KNEE)
+        val knee = listOfNotNull(leftKnee, rightKnee).maxByOrNull { it.score }
+        if (knee != null && knee.score >= MIN_PUSHUP_KEYPOINT_SCORE) {
+            // knee.y > hip.y + 0.15 berarti lutut jauh di bawah pinggul → posisi squat
+            if (knee.y > hip.y + 0.15f) return false
+        }
+
+        return true
     }
 
     private fun handleInvalidPose() {

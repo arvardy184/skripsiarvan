@@ -94,7 +94,8 @@ class BenchmarkLogger(private val context: Context) {
         }
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val fileName = "$FILE_PREFIX$timestamp$FILE_EXTENSION"
+        val label = currentSessionLabel.ifBlank { "nosession" }
+        val fileName = "accelpose_${label}_$timestamp$FILE_EXTENSION"
 
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -211,7 +212,8 @@ class BenchmarkLogger(private val context: Context) {
             "session_label"
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val fileName = "${FILE_PREFIX}summary_$timestamp$FILE_EXTENSION"
+        val label = first.sessionLabel.ifBlank { "nosession" }
+        val fileName = "accelpose_summary_${label}_$timestamp$FILE_EXTENSION"
 
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

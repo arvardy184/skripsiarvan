@@ -175,31 +175,29 @@ class ResourceProfiler(private val context: Context) {
         try {
             val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
 
-            // Get battery current in microamperes (uA)
             val currentNow =
                     batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
 
-            // Get battery voltage
+            // Integer.MIN_VALUE = property tidak didukung hardware (umum di Unisoc/MediaTek entry-level)
+            if (currentNow == Int.MIN_VALUE || currentNow == 0) return 0f
+
             val intentFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
             val batteryStatus = context.registerReceiver(null, intentFilter)
             val voltage = batteryStatus?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0
+            if (voltage <= 0) return 0f
 
-            // Calculate power: P = V * I
-            // voltage is in millivolts (mV)
-            // BATTERY_PROPERTY_CURRENT_NOW unit is device-dependent:
-            //   - Most devices: microamperes (µA) → divide by 1_000_000 to get A
-            //   - Some devices (Samsung, etc.): milliamperes (mA) → divide by 1_000 to get A
-            // Heuristic: if |currentNow| < 50_000, likely mA; otherwise µA
+            // BATTERY_PROPERTY_CURRENT_NOW unit bervariasi per device:
+            // - Kebanyakan: µA → |currentNow| biasanya > 50_000 saat aktif
+            // - Sebagian Samsung/Unisoc: mA → |currentNow| biasanya < 10_000
             val currentAbs = kotlin.math.abs(currentNow.toFloat())
             val powerMw = if (currentAbs < 50_000f) {
-                // Treat as mA: P(mW) = V(mV)/1000 * I(mA) = V*I/1000
                 (voltage.toFloat() * currentAbs) / 1_000f
             } else {
-                // Treat as µA: P(mW) = V(mV)/1000 * I(µA)/1000000 * 1000 = V*I/1_000_000
                 (voltage.toFloat() * currentAbs) / 1_000_000f
             }
 
-            return powerMw
+            // Sanity check: konsumsi daya realistis 100–8000 mW untuk smartphone
+            return if (powerMw in 100f..8_000f) powerMw else 0f
         } catch (e: Exception) {
             Log.e(TAG, "Error reading power consumption", e)
             return 0f

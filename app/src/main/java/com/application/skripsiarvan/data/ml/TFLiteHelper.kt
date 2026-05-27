@@ -16,7 +16,7 @@ data class TFLiteInitializationResult(
         val usedFallback: Boolean
 )
 
-/** Helper class for TensorFlow Lite model loading and delegate management */
+
 class TFLiteHelper(
         private val context: Context,
         private val modelFileName: String,

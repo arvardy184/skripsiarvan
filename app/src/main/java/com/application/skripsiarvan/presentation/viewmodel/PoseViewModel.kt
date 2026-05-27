@@ -106,7 +106,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
     // New components
     private val resourceProfiler = ResourceProfiler(application)
     private val benchmarkLogger = BenchmarkLogger(application)
-    private var exerciseDetector: ExerciseDetector? = null
+    @Volatile private var exerciseDetector: ExerciseDetector? = null
 
     init {
         initializeDetector()
@@ -194,6 +194,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
     /** Update selected model and reinitialize detector */
     fun selectModel(modelType: ModelType) {
         if (_uiState.value.selectedModel != modelType) {
+            abortLoggingIfActive()
             _uiState.value = _uiState.value.copy(selectedModel = modelType, isInitialized = false)
             initializeDetector()
         }
@@ -202,6 +203,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
     /** Update selected delegate and reinitialize detector */
     fun selectDelegate(delegateType: DelegateType) {
         if (_uiState.value.selectedDelegate != delegateType) {
+            abortLoggingIfActive()
             _uiState.value =
                     _uiState.value.copy(
                             selectedDelegate = delegateType,
@@ -215,6 +217,7 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
     /** Update selected exercise type */
     fun selectExercise(exerciseType: ExerciseType) {
         if (_uiState.value.selectedExercise != exerciseType) {
+            abortLoggingIfActive()
             updateExerciseDetector(exerciseType)
             exerciseDetector?.reset()
             _uiState.value =
@@ -224,6 +227,20 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                             currentAngle = 0.0,
                             exerciseState = ExerciseState.IDLE
                     )
+        }
+    }
+
+    /** Stop logging dan buang data saat ini tanpa export (dipanggil saat config berubah mid-session) */
+    private fun abortLoggingIfActive() {
+        if (benchmarkLogger.isCurrentlyLogging()) {
+            benchmarkLogger.stopLogging()
+            benchmarkLogger.clearLog()
+            _uiState.value = _uiState.value.copy(
+                isLogging = false,
+                loggedFrameCount = 0,
+                benchmarkSummary = null,
+                errorMessage = "Logging dihentikan — konfigurasi berubah saat recording"
+            )
         }
     }
 
@@ -356,8 +373,16 @@ class PoseViewModel(application: Application) : AndroidViewModel(application) {
                 "${modelShort}_${delegateShort}_AS_${effectiveDelegateShort}_${exerciseShort}_${repSuffix}"
             }
         }
+        // Reset exercise counter setiap sesi baru agar tidak carry-over dari sesi sebelumnya
+        exerciseDetector?.reset()
         benchmarkLogger.startLogging(label)
-        _uiState.value = _uiState.value.copy(isLogging = true, loggedFrameCount = 0)
+        _uiState.value = _uiState.value.copy(
+            isLogging = true,
+            loggedFrameCount = 0,
+            repetitionCount = 0,
+            currentAngle = 0.0,
+            exerciseState = ExerciseState.IDLE
+        )
     }
 
     /** Stop benchmark logging */
